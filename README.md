@@ -35,7 +35,7 @@ Standard optimizers like AdamW store two full-resolution copies of every gradien
 **🧱 SMO breaks this wall:**
 
 1. **Extreme Compression:** Uses spatial pooling or Walsh transforms to compress optimizer states.
-2. **Spectral Denoising:** The compression acts as a low-pass filter, removing batch noise and improving stability.
+2. **Implicit Low-Pass Regularization:** The compression acts as a low-pass filter, removing batch noise and improving stability.
 
 ## Benchmarks (Post-Optimization)
 
@@ -174,3 +174,5 @@ Original → Pool → Compress → Update → Upsample → Original
 Created by **Mario** 🐢 - "It's-a me!"
 
 > "Wahoo!" - when your model finally fits in VRAM 🎉
+
+"Super Mario" is a trademark of Nintendo. This project is an independent academic implementation and is not affiliated with or endorsed by Nintendo. The name is used purely as a thematic reference.
