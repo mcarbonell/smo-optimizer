@@ -160,6 +160,14 @@ GPU timings must use synchronization.
 
 Without synchronization, timing numbers are not trustworthy.
 
+For local CPU iteration on a busy machine, record both:
+
+- wall-clock time
+- process CPU time
+
+Wall-clock shows user-visible latency.
+Process CPU time is more robust to unrelated system load and is often the better signal for optimizer micro-iteration on a shared workstation.
+
 ### Rule 5
 
 Report both accuracy-quality metrics and memory metrics together.

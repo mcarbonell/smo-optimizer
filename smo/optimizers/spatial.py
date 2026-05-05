@@ -14,7 +14,8 @@ filtering out high-frequency stochastic noise from mini-batches.
 import math
 import torch
 from torch.optim.optimizer import Optimizer
-import torch.nn.functional as F
+
+from ._spatial_utils import compress_2d, compress_2d_pair, upsample_2d_pair
 
 
 class SMO(Optimizer):
@@ -55,8 +56,7 @@ class SMO(Optimizer):
 
     @staticmethod
     def _compress_2d(tensor, target_shape):
-        view = tensor.unsqueeze(0).unsqueeze(0)
-        return F.adaptive_avg_pool2d(view, target_shape).squeeze(0).squeeze(0)
+        return compress_2d(tensor, target_shape)
 
     @torch.no_grad()
     def step(self, closure=None):
@@ -107,7 +107,7 @@ class SMO(Optimizer):
                     # 1. Compress the current gradient (Downsample)
                     # 'area' interpolation (adaptive_avg_pool2d) is mathematically
                     # more stable for gradients than bilinear downsampling.
-                    g_comp = self._compress_2d(grad, exp_avg.shape)
+                    g_comp, g_sq_comp = compress_2d_pair(grad, grad.square(), exp_avg.shape)
                     
                     # 2. Update compressed moments
                     exp_avg.mul_(beta1).add_(g_comp, alpha=1 - beta1)
@@ -115,15 +115,10 @@ class SMO(Optimizer):
                     # The second moment must track E[g^2], not E[g]^2. Using the
                     # squared pooled gradient collapses intra-bin variance and makes
                     # the spatial and 8-bit variants optimize different objectives.
-                    g_sq_comp = self._compress_2d(grad.square(), exp_avg_sq.shape)
                     exp_avg_sq.mul_(beta2).add_(g_sq_comp, alpha=1 - beta2)
 
                     # 3. Decompress (Upsample) to apply the update
-                    m_view = exp_avg.unsqueeze(0).unsqueeze(0)
-                    v_view = exp_avg_sq.unsqueeze(0).unsqueeze(0)
-                    
-                    m_rec = F.interpolate(m_view, size=state['orig_shape'], mode='bilinear', align_corners=False).squeeze(0).squeeze(0)
-                    v_rec = F.interpolate(v_view, size=state['orig_shape'], mode='bilinear', align_corners=False).squeeze(0).squeeze(0)
+                    m_rec, v_rec = upsample_2d_pair(exp_avg, exp_avg_sq, state['orig_shape'])
                     
                     # Ensure strict positivity in v_rec (mitigates interpolation artifacts)
                     v_rec = torch.clamp(v_rec, min=0.0)

@@ -15,6 +15,8 @@ import torch
 from torch.optim.optimizer import Optimizer
 import torch.nn.functional as F
 
+from ._spatial_utils import compress_2d, compress_2d_pair, upsample_2d_pair
+
 class SMO8bit(Optimizer):
     """
     Super Mario Optimizer - 8-bit Quantized Variant.
@@ -49,12 +51,10 @@ class SMO8bit(Optimizer):
 
     @staticmethod
     def _compress_2d(tensor, target_shape):
-        view = tensor.unsqueeze(0).unsqueeze(0)
-        return F.adaptive_avg_pool2d(view, target_shape).squeeze(0).squeeze(0)
+        return compress_2d(tensor, target_shape)
 
     def _quantize_blockwise(self, data, block_size):
         """Quantizes a tensor to 8-bit block-wise."""
-        # Flatten and pad to be divisible by block_size
         orig_shape = data.shape
         flat_data = data.flatten()
         n = flat_data.numel()
@@ -62,26 +62,19 @@ class SMO8bit(Optimizer):
         if pad_size > 0:
             flat_data = F.pad(flat_data, (0, pad_size))
         
-        # Reshape into blocks
         blocks = flat_data.view(-1, block_size)
-        
-        # Calculate scales (max absolute value per block)
         scales = blocks.abs().max(dim=1, keepdim=True)[0]
         scales = scales.clamp(min=1e-12)
-        
-        # Quantize to int8: map [-scale, scale] to [-127, 127]
         q_blocks = (blocks / scales * 127).round().to(torch.int8)
-        
         return q_blocks, scales, orig_shape
 
-    def _dequantize_blockwise(self, q_blocks, scales, orig_shape):
+    def _dequantize_blockwise(self, q_blocks, scales, orig_shape, numel=None):
         """Dequantizes an 8-bit block-wise tensor."""
-        # Dequantize: map [-127, 127] back to [-scale, scale]
         blocks = q_blocks.to(torch.float32) * (scales / 127.0)
-        
-        # Flatten and restore original shape
         flat_data = blocks.flatten()
-        return flat_data[:math.prod(orig_shape)].view(orig_shape)
+        if numel is None:
+            numel = math.prod(orig_shape)
+        return flat_data[:numel].view(orig_shape)
 
     @torch.no_grad()
     def step(self, closure=None):
@@ -111,6 +104,7 @@ class SMO8bit(Optimizer):
                         new_h = max(1, int(grad.shape[0] * k_ratio))
                         new_w = max(1, int(grad.shape[1] * k_ratio))
                         comp_shape = (new_h, new_w)
+                        state['comp_numel'] = new_h * new_w
                         
                         # Initialize states as quantized
                         dummy = torch.zeros(comp_shape, dtype=grad.dtype, device=grad.device)
@@ -133,21 +127,19 @@ class SMO8bit(Optimizer):
 
                 if state['is_compressed']:
                     # 1. Dequantize current state for update
-                    m = self._dequantize_blockwise(state['m_q'], state['m_s'], state['comp_shape'])
-                    v = self._dequantize_blockwise(state['v_q'], state['v_s'], state['comp_shape'])
+                    m = self._dequantize_blockwise(state['m_q'], state['m_s'], state['comp_shape'], state['comp_numel'])
+                    v = self._dequantize_blockwise(state['v_q'], state['v_s'], state['comp_shape'], state['comp_numel'])
                     
                     # 2. Compress gradient
-                    g_comp = self._compress_2d(grad, state['comp_shape'])
+                    g_comp, g_sq_comp = compress_2d_pair(grad, grad.square(), state['comp_shape'])
                     
                     # 3. Update moments (in float32)
                     m.mul_(beta1).add_(g_comp, alpha=1 - beta1)
                     
-                    g_sq_comp = self._compress_2d(grad.square(), state['comp_shape'])
                     v.mul_(beta2).add_(g_sq_comp, alpha=1 - beta2)
                     
                     # 4. Upsample for weight update BEFORE re-quantizing
-                    m_rec = F.interpolate(m.unsqueeze(0).unsqueeze(0), size=state['orig_shape'], mode='bilinear', align_corners=False).squeeze(0).squeeze(0)
-                    v_rec = F.interpolate(v.unsqueeze(0).unsqueeze(0), size=state['orig_shape'], mode='bilinear', align_corners=False).squeeze(0).squeeze(0)
+                    m_rec, v_rec = upsample_2d_pair(m, v, state['orig_shape'])
                     v_rec = torch.clamp(v_rec, min=0.0)
                     
                     # 5. Re-quantize and store

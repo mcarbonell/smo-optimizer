@@ -12,6 +12,8 @@ import torch
 from torch.optim.optimizer import Optimizer
 import torch.nn.functional as F
 
+from ._spatial_utils import compress_2d, compress_2d_pair
+
 try:
     import triton
     import triton.language as tl
@@ -140,8 +142,7 @@ class SMO8bitTriton(Optimizer):
 
     @staticmethod
     def _compress_2d(tensor, target_shape):
-        view = tensor.unsqueeze(0).unsqueeze(0)
-        return F.adaptive_avg_pool2d(view, target_shape).squeeze(0).squeeze(0)
+        return compress_2d(tensor, target_shape)
 
     def _quantize_blockwise(self, data, block_size):
         orig_shape = data.shape
@@ -158,10 +159,12 @@ class SMO8bitTriton(Optimizer):
         q_blocks = (blocks / scales * 127).round().to(torch.int8)
         return q_blocks, scales, orig_shape
 
-    def _dequantize_blockwise(self, q_blocks, scales, orig_shape):
+    def _dequantize_blockwise(self, q_blocks, scales, orig_shape, numel=None):
         blocks = q_blocks.to(torch.float32) * (scales / 127.0)
         flat_data = blocks.flatten()
-        return flat_data[:math.prod(orig_shape)].view(orig_shape)
+        if numel is None:
+            numel = math.prod(orig_shape)
+        return flat_data[:numel].view(orig_shape)
 
     @torch.no_grad()
     def step(self, closure=None):
@@ -191,6 +194,7 @@ class SMO8bitTriton(Optimizer):
                         new_h = max(1, int(grad.shape[0] * k_ratio))
                         new_w = max(1, int(grad.shape[1] * k_ratio))
                         comp_shape = (new_h, new_w)
+                        state['comp_numel'] = new_h * new_w
                         
                         dummy = torch.zeros(comp_shape, dtype=grad.dtype, device=grad.device)
                         m_q, m_s, _ = self._quantize_blockwise(dummy, block_size)
@@ -212,16 +216,15 @@ class SMO8bitTriton(Optimizer):
 
                 if state['is_compressed']:
                     # 1. Dequantize current state (Fast & Tiny in PyTorch)
-                    m = self._dequantize_blockwise(state['m_q'], state['m_s'], state['comp_shape'])
-                    v = self._dequantize_blockwise(state['v_q'], state['v_s'], state['comp_shape'])
+                    m = self._dequantize_blockwise(state['m_q'], state['m_s'], state['comp_shape'], state['comp_numel'])
+                    v = self._dequantize_blockwise(state['v_q'], state['v_s'], state['comp_shape'], state['comp_numel'])
                     
                     # 2. Compress gradient using PyTorch's robust pooler
-                    g_comp = self._compress_2d(grad, state['comp_shape'])
+                    g_comp, g_sq_comp = compress_2d_pair(grad, grad.square(), state['comp_shape'])
                     
                     # 3. Update moments (in float32)
                     m.mul_(beta1).add_(g_comp, alpha=1 - beta1)
                     
-                    g_sq_comp = self._compress_2d(grad.square(), state['comp_shape'])
                     v.mul_(beta2).add_(g_sq_comp, alpha=1 - beta2)
                     
                     # 4. Re-quantize and store (Fast & Tiny)
