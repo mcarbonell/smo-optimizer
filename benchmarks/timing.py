@@ -28,6 +28,29 @@ class TimingResult:
         return self.process_s / self.wall_s
 
 
+def get_sync_fn(device: str | torch.device) -> Callable[[], None] | None:
+    """
+    Returns an appropriate synchronization function for the given device.
+    For CPU: None (no-op).
+    For CUDA: torch.cuda.synchronize().
+    For DirectML (privateuse:0): None (no explicit sync available in standard PyTorch).
+    """
+    import torch
+
+    if isinstance(device, str):
+        device = torch.device(device)
+
+    if device.type == 'cpu':
+        return None
+    elif device.type == 'cuda':
+        return torch.cuda.synchronize
+    elif device.type == 'privateuse:0':
+        # DirectML does not expose a sync function in the standard Python package
+        return None
+    else:
+        return None
+
+
 def measure_steps(
     step_fn: Callable[[], None],
     *,

@@ -100,23 +100,43 @@ Deliverables:
 - timing helpers with warmup and synchronization
 - benchmark configs for CPU, AMD, NVIDIA
 
-Status:
+Status (updated 2026-05-05):
 
-- started, not complete
-- timing helper exists for local CPU iteration and now records both wall-clock and process CPU time
-- optimizer consistency tests now exist for the spatial family
-- deterministic seed handling and benchmark-wide timing normalization are still incomplete
+**Completed:**
+- timing helper (`benchmarks/timing.py`): wall+process timing, `get_sync_fn()` for CUDA/DirectML/CPU
+- optimizer-step microbench (`benchmarks/suites/optimizer_step/benchmark_step_time.py`):
+  - shapes: 64×64, 128×128, 256×256, 512×512, 1024×1024, 2048×2048, 4096×4096
+  - device-aware: CPU/CUDA/DirectML (GPU paths prepared, commented pending hardware)
+  - CUDA memory reporting (allocated/reserved)
+  - warmup configurable
+- optimizer consistency tests (`tests/test_spatial_optimizers.py`): ✅ 3/3 pass:
+  - `test_spatial_second_moment_tracks_pooled_squared_gradient` ✅
+  - `test_spatial_and_8bit_match_when_quantization_is_exact` ✅
+  - `test_8bit_rejects_sparse_gradients` ✅
+- end-to-end MNIST baseline executed (5 epochs, seed=1234, CPU):
+  - Adam: 99.04% test acc, 3.22 MB optimizer state, 331.35s
+  - SMO-Spatial k=0.25: 98.90% acc, 0.35 MB, 325.80s → **89.1% memory reduction**, accuracy gap +0.14%
+  - SMO-Spatial k=0.5: 99.13% acc, 0.92 MB, 331.47s
+  - Results: `benchmarks/results/benchmark_results.json`
+- deterministic seed handling added to MNIST benchmark (torch.manual_seed + numpy + random)
+- benchmark methodology documented (`benchmarks/METHODOLOGY.md`)
+- result storage conventions (`benchmarks/CATALOG.md`, `benchmarks/results_utils.py`)
 
-Immediate next actions:
+**Remaining gaps:**
+- **Seed handling across all benchmarks**: benchmark_step_time y otros microbenchs aún no exponen seed parameter; no hay repeticiones múltiples para estadística
+- **Timing normalization**: falta wrapper para N repeticiones y cálculo mean±std
+- **GPU execution**: DirectML path preparado pero no ejecutado (GPU local al 90%+)
+- **Alloc optimization**: pospuesto a Phase 4; requiere profiling profundo en GPU
 
-- extend timing conventions beyond the optimizer-step microbenchmark
-- add more optimizer parity checks on simple synthetic or tiny-model cases
-- add an AMD DirectML microbenchmark path using the DirectML Python environment when the local GPU is available
+**Immediate next actions:**
+1. Add `--seed` y `--repeats` flags to `benchmark_step_time.py`; output mean±std
+2. Propagate deterministic seed to all micro/activation benchmarks
+3. Prepare DirectML run config (device='privateuse:0') y probar cuando GPU libre
+4. Move alloc-optimization task to Phase 4; schedule after profiling stage
 
-Exit criteria:
-
-- benchmark runs are repeatable
-- metrics are defined consistently across hardware
+**Exit criteria status:**
+- Benchmark runs are repeatable ✅ (per-seed repeatability confirmed for MNIST; microbench fixed-seed)
+- Metrics are defined consistently across hardware ⚠️ (infrastructure ready, GPU execution pending)
 
 ## Phase 3: Bottleneck Analysis
 

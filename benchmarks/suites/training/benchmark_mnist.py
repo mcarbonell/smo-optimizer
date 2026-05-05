@@ -86,10 +86,16 @@ def evaluate(model, loader, device):
     return 100.0 * correct / total
 
 
-def run_experiment(optimizer_name, optimizer_fn, epochs=5, device='cpu'):
+def run_experiment(optimizer_name, optimizer_fn, epochs=5, device='cpu', seed=1234):
     """Run full training experiment with given optimizer factory."""
+    torch.manual_seed(seed)
+    import numpy as np
+    np.random.seed(seed)
+    import random
+    random.seed(seed)
+    
     print(f"\n{'='*60}")
-    print(f"Running: {optimizer_name}")
+    print(f"Running: {optimizer_name} (seed={seed})")
     print(f"{'='*60}")
     
     # Load MNIST
@@ -125,7 +131,8 @@ def run_experiment(optimizer_name, optimizer_fn, epochs=5, device='cpu'):
         'optimizer': optimizer_name,
         'parameters': param_count,
         'epochs': [],
-        'train_time': 0
+        'train_time': 0,
+        'seed': seed,  # deterministic seed
     }
     
     start_time = time.time()
@@ -180,7 +187,8 @@ def main():
         "Standard Adam",
         lambda params: torch.optim.Adam(params, lr=1e-3),
         epochs=epochs,
-        device=device
+        device=device,
+        seed=1234
     )
     
     # Run SMO (k_ratio=0.25)
@@ -188,7 +196,8 @@ def main():
         "SMO (k_ratio=0.25)",
         lambda params: SMO(params, lr=1e-3, k_ratio=0.25),
         epochs=epochs,
-        device=device
+        device=device,
+        seed=1234
     )
     
     # Run SMO (k_ratio=0.5) - middle ground
@@ -196,7 +205,8 @@ def main():
         "SMO (k_ratio=0.5)",
         lambda params: SMO(params, lr=1e-3, k_ratio=0.5),
         epochs=epochs,
-        device=device
+        device=device,
+        seed=1234
     )
     
     # Summary
