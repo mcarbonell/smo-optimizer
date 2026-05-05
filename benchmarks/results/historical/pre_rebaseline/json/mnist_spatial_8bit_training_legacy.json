@@ -1,0 +1,138 @@
+{
+  "adam": {
+    "optimizer": "Standard Adam",
+    "parameters": 421642,
+    "epochs": [
+      {
+        "epoch": 1,
+        "train_loss": 0.1568,
+        "train_acc": 95.25,
+        "test_acc": 98.3,
+        "time": 84.74
+      },
+      {
+        "epoch": 2,
+        "train_loss": 0.0477,
+        "train_acc": 98.52,
+        "test_acc": 98.67,
+        "time": 82.73
+      },
+      {
+        "epoch": 3,
+        "train_loss": 0.0317,
+        "train_acc": 98.99,
+        "test_acc": 99.01,
+        "time": 79.2
+      },
+      {
+        "epoch": 4,
+        "train_loss": 0.0238,
+        "train_acc": 99.26,
+        "test_acc": 98.92,
+        "time": 79.0
+      },
+      {
+        "epoch": 5,
+        "train_loss": 0.0183,
+        "train_acc": 99.41,
+        "test_acc": 98.9,
+        "time": 79.18
+      }
+    ],
+    "train_time": 0,
+    "total_time": 404.86,
+    "optimizer_memory_mb": 3.22,
+    "final_test_acc": 98.9
+  },
+  "smo_k025": {
+    "optimizer": "SMO (k_ratio=0.25) [Spatial Only]",
+    "parameters": 421642,
+    "epochs": [
+      {
+        "epoch": 1,
+        "train_loss": 0.3364,
+        "train_acc": 89.78,
+        "test_acc": 97.46,
+        "time": 84.12
+      },
+      {
+        "epoch": 2,
+        "train_loss": 0.0822,
+        "train_acc": 97.48,
+        "test_acc": 97.64,
+        "time": 83.52
+      },
+      {
+        "epoch": 3,
+        "train_loss": 0.0583,
+        "train_acc": 98.24,
+        "test_acc": 98.78,
+        "time": 84.17
+      },
+      {
+        "epoch": 4,
+        "train_loss": 0.0447,
+        "train_acc": 98.58,
+        "test_acc": 98.58,
+        "time": 97.85
+      },
+      {
+        "epoch": 5,
+        "train_loss": 0.0393,
+        "train_acc": 98.78,
+        "test_acc": 98.8,
+        "time": 105.91
+      }
+    ],
+    "train_time": 0,
+    "total_time": 455.57,
+    "optimizer_memory_mb": 0.35,
+    "final_test_acc": 98.8
+  },
+  "smo_8bit_k025": {
+    "optimizer": "SMO-8bit (k_ratio=0.25) [Spatial + 8-bit Quantized]",
+    "parameters": 421642,
+    "epochs": [
+      {
+        "epoch": 1,
+        "train_loss": 0.3266,
+        "train_acc": 90.37,
+        "test_acc": 97.45,
+        "time": 85.05
+      },
+      {
+        "epoch": 2,
+        "train_loss": 0.0856,
+        "train_acc": 97.32,
+        "test_acc": 97.85,
+        "time": 86.28
+      },
+      {
+        "epoch": 3,
+        "train_loss": 0.0601,
+        "train_acc": 98.19,
+        "test_acc": 98.45,
+        "time": 83.86
+      },
+      {
+        "epoch": 4,
+        "train_loss": 0.0492,
+        "train_acc": 98.46,
+        "test_acc": 98.88,
+        "time": 79.76
+      },
+      {
+        "epoch": 5,
+        "train_loss": 0.0396,
+        "train_acc": 98.74,
+        "test_acc": 98.59,
+        "time": 66.7
+      }
+    ],
+    "train_time": 0,
+    "total_time": 401.66,
+    "optimizer_memory_mb": 0.21,
+    "final_test_acc": 98.59
+  },
+  "memory_savings_percent": 93.5
+}

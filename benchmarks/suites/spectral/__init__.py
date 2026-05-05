@@ -1,0 +1,2 @@
+"""Spectral benchmark suite."""
+

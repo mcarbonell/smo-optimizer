@@ -1,0 +1,139 @@
+{
+  "adam": {
+    "optimizer": "Standard Adam",
+    "parameters": 421642,
+    "epochs": [
+      {
+        "epoch": 1,
+        "train_loss": 0.174,
+        "train_acc": 94.79,
+        "test_acc": 98.33,
+        "time": 105.62
+      },
+      {
+        "epoch": 2,
+        "train_loss": 0.0499,
+        "train_acc": 98.44,
+        "test_acc": 98.87,
+        "time": 90.16
+      },
+      {
+        "epoch": 3,
+        "train_loss": 0.0343,
+        "train_acc": 98.95,
+        "test_acc": 98.76,
+        "time": 80.08
+      },
+      {
+        "epoch": 4,
+        "train_loss": 0.0242,
+        "train_acc": 99.24,
+        "test_acc": 98.99,
+        "time": 80.57
+      },
+      {
+        "epoch": 5,
+        "train_loss": 0.019,
+        "train_acc": 99.41,
+        "test_acc": 98.86,
+        "time": 76.33
+      }
+    ],
+    "train_time": 0,
+    "total_time": 432.77,
+    "optimizer_memory_mb": 3.22,
+    "final_test_acc": 98.86
+  },
+  "smo_walsh_k025": {
+    "optimizer": "SMOWalsh (k_ratio=0.25) [Square Waves]",
+    "parameters": 421642,
+    "epochs": [
+      {
+        "epoch": 1,
+        "train_loss": 0.4805,
+        "train_acc": 86.43,
+        "test_acc": 94.74,
+        "time": 306.46
+      },
+      {
+        "epoch": 2,
+        "train_loss": 0.1533,
+        "train_acc": 95.44,
+        "test_acc": 96.67,
+        "time": 284.32
+      },
+      {
+        "epoch": 3,
+        "train_loss": 0.1059,
+        "train_acc": 96.82,
+        "test_acc": 97.55,
+        "time": 296.96
+      },
+      {
+        "epoch": 4,
+        "train_loss": 0.0884,
+        "train_acc": 97.42,
+        "test_acc": 97.83,
+        "time": 287.22
+      },
+      {
+        "epoch": 5,
+        "train_loss": 0.0751,
+        "train_acc": 97.8,
+        "test_acc": 98.22,
+        "time": 285.97
+      }
+    ],
+    "train_time": 0,
+    "total_time": 1460.94,
+    "optimizer_memory_mb": 0.4,
+    "final_test_acc": 98.22
+  },
+  "smo_dct_k025": {
+    "optimizer": "SMODCT (k_ratio=0.25) [Smooth Cosines]",
+    "parameters": 421642,
+    "epochs": [
+      {
+        "epoch": 1,
+        "train_loss": 0.3187,
+        "train_acc": 90.44,
+        "test_acc": 97.48,
+        "time": 50.65
+      },
+      {
+        "epoch": 2,
+        "train_loss": 0.0802,
+        "train_acc": 97.55,
+        "test_acc": 98.36,
+        "time": 46.95
+      },
+      {
+        "epoch": 3,
+        "train_loss": 0.0544,
+        "train_acc": 98.3,
+        "test_acc": 98.77,
+        "time": 46.56
+      },
+      {
+        "epoch": 4,
+        "train_loss": 0.0467,
+        "train_acc": 98.63,
+        "test_acc": 98.41,
+        "time": 39.17
+      },
+      {
+        "epoch": 5,
+        "train_loss": 0.038,
+        "train_acc": 98.84,
+        "test_acc": 98.77,
+        "time": 39.15
+      }
+    ],
+    "train_time": 0,
+    "total_time": 222.5,
+    "optimizer_memory_mb": 0.35,
+    "final_test_acc": 98.77
+  },
+  "memory_savings_percent": 89.1,
+  "dct_time_overhead_percent": -84.8
+}

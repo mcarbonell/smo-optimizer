@@ -1,0 +1,170 @@
+{
+  "AdamW": {
+    "epochs": [
+      {
+        "epoch": 1,
+        "train_loss": 1.6982697492365337,
+        "train_acc": 37.186,
+        "test_acc": 46.79,
+        "time": 4.808067083358765
+      },
+      {
+        "epoch": 2,
+        "train_loss": 1.4192366026856404,
+        "train_acc": 48.108,
+        "test_acc": 56.1,
+        "time": 4.212666273117065
+      },
+      {
+        "epoch": 3,
+        "train_loss": 1.2828271730476632,
+        "train_acc": 53.29,
+        "test_acc": 62.22,
+        "time": 3.8204667568206787
+      },
+      {
+        "epoch": 4,
+        "train_loss": 1.1960509119131375,
+        "train_acc": 57.17,
+        "test_acc": 65.24,
+        "time": 3.862187147140503
+      },
+      {
+        "epoch": 5,
+        "train_loss": 1.1443857593304665,
+        "train_acc": 58.89,
+        "test_acc": 65.85,
+        "time": 4.043069362640381
+      }
+    ],
+    "total_time": 20.74715304374695,
+    "optimizer_memory_mb": 4.7364654541015625,
+    "final_test_acc": 65.85
+  },
+  "SMO_Spatial": {
+    "epochs": [
+      {
+        "epoch": 1,
+        "train_loss": 1.661006991820567,
+        "train_acc": 38.092,
+        "test_acc": 50.74,
+        "time": 4.206570863723755
+      },
+      {
+        "epoch": 2,
+        "train_loss": 1.3663954826267175,
+        "train_acc": 50.092,
+        "test_acc": 56.47,
+        "time": 4.978790760040283
+      },
+      {
+        "epoch": 3,
+        "train_loss": 1.2279816070176146,
+        "train_acc": 55.492,
+        "test_acc": 62.51,
+        "time": 3.8464417457580566
+      },
+      {
+        "epoch": 4,
+        "train_loss": 1.1464741024214897,
+        "train_acc": 59.008,
+        "test_acc": 61.0,
+        "time": 3.920410394668579
+      },
+      {
+        "epoch": 5,
+        "train_loss": 1.0805675128231877,
+        "train_acc": 61.596,
+        "test_acc": 65.7,
+        "time": 4.333726167678833
+      }
+    ],
+    "total_time": 21.2863130569458,
+    "optimizer_memory_mb": 1.7364044189453125,
+    "final_test_acc": 65.7
+  },
+  "SMO_Walsh": {
+    "epochs": [
+      {
+        "epoch": 1,
+        "train_loss": 1.6655509157863724,
+        "train_acc": 38.044,
+        "test_acc": 49.01,
+        "time": 5.033641338348389
+      },
+      {
+        "epoch": 2,
+        "train_loss": 1.3731093367042444,
+        "train_acc": 49.736,
+        "test_acc": 53.53,
+        "time": 4.4328930377960205
+      },
+      {
+        "epoch": 3,
+        "train_loss": 1.2437311516088598,
+        "train_acc": 54.82,
+        "test_acc": 61.52,
+        "time": 4.737725019454956
+      },
+      {
+        "epoch": 4,
+        "train_loss": 1.1501282787383975,
+        "train_acc": 58.654,
+        "test_acc": 62.51,
+        "time": 4.135176420211792
+      },
+      {
+        "epoch": 5,
+        "train_loss": 1.093864724001921,
+        "train_acc": 60.912,
+        "test_acc": 60.97,
+        "time": 3.9041740894317627
+      }
+    ],
+    "total_time": 22.24401593208313,
+    "optimizer_memory_mb": 1.7364044189453125,
+    "final_test_acc": 60.97
+  },
+  "SMO_DCT": {
+    "epochs": [
+      {
+        "epoch": 1,
+        "train_loss": 1.6695253885615513,
+        "train_acc": 38.238,
+        "test_acc": 48.86,
+        "time": 3.978241205215454
+      },
+      {
+        "epoch": 2,
+        "train_loss": 1.3825940838860125,
+        "train_acc": 49.544,
+        "test_acc": 55.38,
+        "time": 3.9261245727539062
+      },
+      {
+        "epoch": 3,
+        "train_loss": 1.2402505264867603,
+        "train_acc": 55.038,
+        "test_acc": 57.85,
+        "time": 3.743173360824585
+      },
+      {
+        "epoch": 4,
+        "train_loss": 1.1507495724026808,
+        "train_acc": 58.63,
+        "test_acc": 65.73,
+        "time": 3.7637219429016113
+      },
+      {
+        "epoch": 5,
+        "train_loss": 1.0895506611565495,
+        "train_acc": 61.276,
+        "test_acc": 66.13,
+        "time": 3.9073574542999268
+      }
+    ],
+    "total_time": 19.31890034675598,
+    "optimizer_memory_mb": 1.7364044189453125,
+    "final_test_acc": 66.13
+  }
+}

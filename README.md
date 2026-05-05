@@ -36,31 +36,33 @@ Recommendation:
 
 ## Repository Status
 
-Today the repo contains three different maturity levels:
+Today the repo is organized around four main areas:
 
-- `smo/`: main implementation candidates
-- `spectral/`: experimental spectral variants and research prototypes
-- `benchmarks/` plus root benchmark scripts: benchmark work in progress
+- `smo/optimizers/`: main optimizer implementations
+- `smo/activations/`: activation-memory experiments
+- `smo/experimental/`: spectral and other experimental variants
+- `benchmarks/`: benchmark suites, hardware runners, methodology, and stored results
 
-There is also new activation-compression work not yet integrated into a stable evaluation pipeline.
+Backward-compatible wrappers are still present at the old import paths to ease the transition.
 
 ## Project Documents
 
 - [Project Foundation](/C:/Users/mrcm_/Local/proj/algorithms/supermario_optimizer/docs/PROJECT_FOUNDATION.md)
 - [Roadmap](/C:/Users/mrcm_/Local/proj/algorithms/supermario_optimizer/docs/ROADMAP.md)
 - [Benchmark Methodology](/C:/Users/mrcm_/Local/proj/algorithms/supermario_optimizer/benchmarks/METHODOLOGY.md)
+- [Benchmark Catalog](/C:/Users/mrcm_/Local/proj/algorithms/supermario_optimizer/benchmarks/CATALOG.md)
 
 ## Proposed Variant Taxonomy
 
 The current repo names can be normalized like this:
 
-- `SMO-Spatial`: current `smo/optim.py`
-- `SMO-Spatial-8bit`: current `smo/optim_8bit.py`
-- `SMO-Spatial-Triton`: current `smo/optim_triton.py`
-- `SMO-Spatial-8bit-Triton`: current `smo/optim_8bit_triton.py`
-- `SMO-Walsh`: current `spectral/optim_walsh.py`
-- `SMO-DCT`: current `spectral/optim_dct.py`
-- `SMO-Activation-FP16` / `SMO-Activation-8bit` / `SMO-Activation-Delta`: current activation-memory experiments
+- `SMO-Spatial`: current `smo/optimizers/spatial.py`
+- `SMO-Spatial-8bit`: current `smo/optimizers/spatial_8bit.py`
+- `SMO-Spatial-Triton`: current `smo/optimizers/spatial_triton.py`
+- `SMO-Spatial-8bit-Triton`: current `smo/optimizers/spatial_8bit_triton.py`
+- `SMO-Walsh`: current `smo/experimental/walsh.py`
+- `SMO-DCT`: current `smo/experimental/dct.py`
+- `SMO-Activation-FP16` / `SMO-Activation-8bit` / `SMO-Activation-Delta`: current `smo/activations/`
 
 This preserves continuity while making it much easier to compare variants cleanly.
 

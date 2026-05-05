@@ -1,15 +1,22 @@
-"""
-SMO: Super Mario Optimizer
+"""Top-level SMO exports."""
 
-A highly compressed, memory-efficient PyTorch optimizer based on spectral/spatial compression.
+from .activations import SMOActivationSqueezer, smo_squeezer, wrap_model_activations, wrap_model_delta
+from .experimental import SMODCT, SMODCTPure, SMOWalsh, SMOWalshPure
+from .optimizers import HAS_TRITON, HAS_TRITON_SPATIAL, SMO, SMO8bit, SMO8bitTriton, SMOTriton
 
-Versions:
-- SMO: Uses adaptive average pooling (spatial compression)
-- SMO 8-bit: Spatial compression + 8-bit quantization
-"""
-
-from .optim import SMO
-from .optim_8bit import SMO8bit
-from .optim_8bit_triton import SMO8bitTriton
-
-__all__ = ['SMO', 'SMO8bit', 'SMO8bitTriton']
+__all__ = [
+    "HAS_TRITON",
+    "HAS_TRITON_SPATIAL",
+    "SMO",
+    "SMO8bit",
+    "SMO8bitTriton",
+    "SMOActivationSqueezer",
+    "SMODCT",
+    "SMODCTPure",
+    "SMOTriton",
+    "SMOWalsh",
+    "SMOWalshPure",
+    "smo_squeezer",
+    "wrap_model_activations",
+    "wrap_model_delta",
+]

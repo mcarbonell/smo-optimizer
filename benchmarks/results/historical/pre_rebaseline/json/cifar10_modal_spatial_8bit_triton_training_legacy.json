@@ -1,0 +1,128 @@
+{
+  "AdamW": {
+    "epochs": [
+      {
+        "epoch": 1,
+        "train_loss": 1.655902369552866,
+        "train_acc": 38.664,
+        "test_acc": 50.01,
+        "time": 6.610679626464844
+      },
+      {
+        "epoch": 2,
+        "train_loss": 1.3739633782745322,
+        "train_acc": 49.884,
+        "test_acc": 55.88,
+        "time": 5.220215082168579
+      },
+      {
+        "epoch": 3,
+        "train_loss": 1.252774131877343,
+        "train_acc": 54.594,
+        "test_acc": 63.78,
+        "time": 5.221960783004761
+      },
+      {
+        "epoch": 4,
+        "train_loss": 1.1699682817129833,
+        "train_acc": 57.66,
+        "test_acc": 64.35,
+        "time": 5.134880781173706
+      },
+      {
+        "epoch": 5,
+        "train_loss": 1.1037627694856784,
+        "train_acc": 60.634,
+        "test_acc": 67.75,
+        "time": 5.328089475631714
+      }
+    ],
+    "total_time": 27.516974687576294,
+    "optimizer_memory_mb": 4.7364654541015625,
+    "final_test_acc": 67.75
+  },
+  "SMO_8bit_PyTorch": {
+    "epochs": [
+      {
+        "epoch": 1,
+        "train_loss": 1.6659665763225702,
+        "train_acc": 37.482,
+        "test_acc": 49.7,
+        "time": 5.573163747787476
+      },
+      {
+        "epoch": 2,
+        "train_loss": 1.383001293367742,
+        "train_acc": 49.398,
+        "test_acc": 56.43,
+        "time": 5.249870777130127
+      },
+      {
+        "epoch": 3,
+        "train_loss": 1.257766630338586,
+        "train_acc": 54.34,
+        "test_acc": 60.39,
+        "time": 5.325108051300049
+      },
+      {
+        "epoch": 4,
+        "train_loss": 1.1638308425083794,
+        "train_acc": 58.138,
+        "test_acc": 63.97,
+        "time": 5.293812274932861
+      },
+      {
+        "epoch": 5,
+        "train_loss": 1.1136863053302326,
+        "train_acc": 60.094,
+        "test_acc": 65.35,
+        "time": 5.2761876583099365
+      }
+    ],
+    "total_time": 26.718656301498413,
+    "optimizer_memory_mb": 0.8028106689453125,
+    "final_test_acc": 65.35
+  },
+  "SMO_8bit_Triton": {
+    "epochs": [
+      {
+        "epoch": 1,
+        "train_loss": 1.678491029897919,
+        "train_acc": 37.356,
+        "test_acc": 45.63,
+        "time": 7.534449815750122
+      },
+      {
+        "epoch": 2,
+        "train_loss": 1.3782468302475521,
+        "train_acc": 49.358,
+        "test_acc": 52.13,
+        "time": 5.432560443878174
+      },
+      {
+        "epoch": 3,
+        "train_loss": 1.2570421922847133,
+        "train_acc": 54.388,
+        "test_acc": 57.08,
+        "time": 5.3884196281433105
+      },
+      {
+        "epoch": 4,
+        "train_loss": 1.1692490048725586,
+        "train_acc": 57.902,
+        "test_acc": 61.82,
+        "time": 5.4466869831085205
+      },
+      {
+        "epoch": 5,
+        "train_loss": 1.1175634115553268,
+        "train_acc": 59.986,
+        "test_acc": 61.91,
+        "time": 5.438932180404663
+      }
+    ],
+    "total_time": 29.24165916442871,
+    "optimizer_memory_mb": 0.8028106689453125,
+    "final_test_acc": 61.91
+  }
+}

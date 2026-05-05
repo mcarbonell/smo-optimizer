@@ -1,0 +1,139 @@
+{
+  "adam": {
+    "optimizer": "Standard Adam",
+    "parameters": 421642,
+    "epochs": [
+      {
+        "epoch": 1,
+        "train_loss": 0.1674,
+        "train_acc": 94.9,
+        "test_acc": 98.09,
+        "time": 17.66
+      },
+      {
+        "epoch": 2,
+        "train_loss": 0.0498,
+        "train_acc": 98.46,
+        "test_acc": 98.45,
+        "time": 26.28
+      },
+      {
+        "epoch": 3,
+        "train_loss": 0.0339,
+        "train_acc": 98.94,
+        "test_acc": 98.89,
+        "time": 24.56
+      },
+      {
+        "epoch": 4,
+        "train_loss": 0.0243,
+        "train_acc": 99.23,
+        "test_acc": 99.08,
+        "time": 25.16
+      },
+      {
+        "epoch": 5,
+        "train_loss": 0.0189,
+        "train_acc": 99.4,
+        "test_acc": 99.01,
+        "time": 25.13
+      }
+    ],
+    "train_time": 0,
+    "total_time": 118.79,
+    "optimizer_memory_mb": 3.22,
+    "final_test_acc": 99.01
+  },
+  "swo_k025": {
+    "optimizer": "SMO (k_ratio=0.25)",
+    "parameters": 421642,
+    "epochs": [
+      {
+        "epoch": 1,
+        "train_loss": 0.291,
+        "train_acc": 90.89,
+        "test_acc": 97.41,
+        "time": 26.76
+      },
+      {
+        "epoch": 2,
+        "train_loss": 0.0674,
+        "train_acc": 97.88,
+        "test_acc": 98.29,
+        "time": 26.94
+      },
+      {
+        "epoch": 3,
+        "train_loss": 0.0474,
+        "train_acc": 98.56,
+        "test_acc": 98.74,
+        "time": 27.19
+      },
+      {
+        "epoch": 4,
+        "train_loss": 0.0382,
+        "train_acc": 98.78,
+        "test_acc": 98.61,
+        "time": 26.57
+      },
+      {
+        "epoch": 5,
+        "train_loss": 0.0305,
+        "train_acc": 99.07,
+        "test_acc": 98.87,
+        "time": 27.69
+      }
+    ],
+    "train_time": 0,
+    "total_time": 135.16,
+    "optimizer_memory_mb": 0.35,
+    "final_test_acc": 98.87
+  },
+  "swo_k050": {
+    "optimizer": "SMO (k_ratio=0.5)",
+    "parameters": 421642,
+    "epochs": [
+      {
+        "epoch": 1,
+        "train_loss": 0.2211,
+        "train_acc": 93.44,
+        "test_acc": 97.64,
+        "time": 26.67
+      },
+      {
+        "epoch": 2,
+        "train_loss": 0.0555,
+        "train_acc": 98.32,
+        "test_acc": 98.85,
+        "time": 26.47
+      },
+      {
+        "epoch": 3,
+        "train_loss": 0.0387,
+        "train_acc": 98.78,
+        "test_acc": 98.81,
+        "time": 26.73
+      },
+      {
+        "epoch": 4,
+        "train_loss": 0.0324,
+        "train_acc": 98.98,
+        "test_acc": 99.13,
+        "time": 27.01
+      },
+      {
+        "epoch": 5,
+        "train_loss": 0.0246,
+        "train_acc": 99.23,
+        "test_acc": 99.06,
+        "time": 33.03
+      }
+    ],
+    "train_time": 0,
+    "total_time": 139.91,
+    "optimizer_memory_mb": 0.92,
+    "final_test_acc": 99.06
+  },
+  "memory_savings_percent": 89.1,
+  "accuracy_gap_percent": 0.14
+}
