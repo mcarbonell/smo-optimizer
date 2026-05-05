@@ -110,7 +110,8 @@ class SMO(Optimizer):
                     exp_avg.mul_(beta1).add_(g_comp, alpha=1 - beta1)
                     
                     # Compress squared gradient for the second moment
-                    g_sq_comp = F.adaptive_avg_pool2d((grad ** 2).unsqueeze(0).unsqueeze(0), exp_avg_sq.shape).squeeze(0).squeeze(0)
+                    # Reuse g_comp to avoid computing grad**2 at full resolution
+                    g_sq_comp = g_comp ** 2
                     exp_avg_sq.mul_(beta2).add_(g_sq_comp, alpha=1 - beta2)
 
                     # 3. Decompress (Upsample) to apply the update

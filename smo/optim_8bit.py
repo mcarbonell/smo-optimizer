@@ -137,14 +137,17 @@ class SMO8bit(Optimizer):
                     g_sq_comp = F.adaptive_avg_pool2d((grad**2).unsqueeze(0).unsqueeze(0), state['comp_shape']).squeeze(0).squeeze(0)
                     v.mul_(beta2).add_(g_sq_comp, alpha=1 - beta2)
                     
-                    # 4. Re-quantize and store
-                    state['m_q'], state['m_s'], _ = self._quantize_blockwise(m, block_size)
-                    state['v_q'], state['v_s'], _ = self._quantize_blockwise(v, block_size)
-                    
-                    # 5. Upsample for weight update
+                    # 4. Upsample for weight update BEFORE re-quantizing
                     m_rec = F.interpolate(m.unsqueeze(0).unsqueeze(0), size=state['orig_shape'], mode='bilinear', align_corners=False).squeeze(0).squeeze(0)
                     v_rec = F.interpolate(v.unsqueeze(0).unsqueeze(0), size=state['orig_shape'], mode='bilinear', align_corners=False).squeeze(0).squeeze(0)
                     v_rec = torch.clamp(v_rec, min=0.0)
+                    
+                    # 5. Re-quantize and store
+                    state['m_q'], state['m_s'], _ = self._quantize_blockwise(m, block_size)
+                    state['v_q'], state['v_s'], _ = self._quantize_blockwise(v, block_size)
+                    
+                    # 6. Free temporary float32 tensors immediately to avoid VRAM spikes
+                    del m, v
                 else:
                     # Fallback for 1D/small tensors
                     state['exp_avg'].mul_(beta1).add_(grad, alpha=1 - beta1)
