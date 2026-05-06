@@ -196,8 +196,27 @@ Exit criteria:
 4. Activation compression: separate track (not part of optimizer-state claims)
 
 **Phase 4 exit criteria:**
-- Each major slowdown is attached to a measured source (buffers done, next: pooling kernel analysis)
-- Next kernel work guided by profiling, not intuition (profiling pending GPU)
+- Each major slowdown is attached to a measured source (buffers done; profiling suite ready)
+- Next kernel work guided by profiling, not intuition (GPU profiling pending)
+
+## Phase 3 Prep: Profiling Infrastructure (READY — 2026-05-06)
+
+**New tool:** `profiles/profile_smo_step.py`
+
+Dual-mode profiler for SMO-Spatial:
+- **Manual timers** — decomposes step into: compress → update compressed → upsample → full step; reports mean±std per-phase
+- **torch.profiler** — kernel-level trace (exports Chrome JSON for flame graphs); CPU + CUDA
+
+Usage:
+```bash
+# Manual breakdown (CPU)
+python profiles/profile_smo_step.py --shape 1024,1024 --steps 100 --warmup 10 --seed 1234
+
+# Kernel trace (requires CUDA)
+python profiles/profile_smo_step.py --shape 1024,1024 --device cuda --use_torch_profiler
+```
+
+**Status:** Infrastructure ready on CPU; GPU execution blocked (local DirectML >90% utilization). Will run profiling sweep across k_ratios and shapes when GPU frees.
 
 ## Phase 5: Benchmark Publication
 

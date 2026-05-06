@@ -6,22 +6,34 @@ Trains a simple CNN on MNIST to compare:
 2. AdamW + SMO 8-bit Quantized Activations
 """
 
-# Benchmark classification: family=activation_memory, category=end_to_end, status=canonical
+import argparse
+import sys
+from pathlib import Path
+import time
+import random
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
-import time
-import os
-import sys
 
+# Add project root
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from benchmarks._paths import add_project_root_to_path
-
 add_project_root_to_path()
 
 from smo.activations_8bit import wrap_model_activations
+
+
+def set_seed(seed: int):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
 
 class SimpleCNN(nn.Module):
     def __init__(self):
@@ -47,6 +59,7 @@ class SimpleCNN(nn.Module):
         x = self.fc2(x)
         return x
 
+
 def train(model, device, train_loader, optimizer, epoch):
     model.train()
     total_loss = 0
@@ -59,6 +72,7 @@ def train(model, device, train_loader, optimizer, epoch):
         optimizer.step()
         total_loss += loss.item()
     return total_loss / len(train_loader)
+
 
 def test(model, device, test_loader):
     model.eval()
@@ -75,14 +89,15 @@ def test(model, device, test_loader):
     accuracy = 100. * correct / len(test_loader.dataset)
     return test_loss, accuracy
 
+
 def measure_memory_usage():
     if torch.cuda.is_available():
         return torch.cuda.max_memory_allocated() / (1024 ** 2)
-    return 0 # On CPU we can't easily measure peak activation RAM with PyTorch tools
+    return 0  # On CPU we can't easily measure peak activation RAM
 
-def run_experiment(use_smo_activations=False):
-    torch.manual_seed(42)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+def run_experiment(use_smo_activations=False, epochs=1, device='cpu', seed=1234):
+    set_seed(seed)
     
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats()
@@ -95,7 +110,7 @@ def run_experiment(use_smo_activations=False):
     train_dataset = datasets.MNIST('./data', train=True, download=True, transform=transform)
     test_dataset = datasets.MNIST('./data', train=False, transform=transform)
     
-    train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True) # Increased batch size to see memory more clearly
+    train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=1000, shuffle=False)
     
     model = SimpleCNN().to(device)
@@ -105,7 +120,6 @@ def run_experiment(use_smo_activations=False):
     
     optimizer = optim.AdamW(model.parameters(), lr=1e-3)
     
-    epochs = 1 # 1 epoch is enough to measure peak memory and check initial convergence
     print(f"Training for {epochs} epoch(s)...")
     
     start_time = time.time()
@@ -119,15 +133,22 @@ def run_experiment(use_smo_activations=False):
     
     return accuracy, total_time, peak_mem
 
+
 def main():
+    parser = argparse.ArgumentParser(description="Accuracy & memory test: AdamW vs SMO 8-bit activations on MNIST")
+    parser.add_argument('--epochs', type=int, default=1, help='Number of training epochs')
+    parser.add_argument('--seed', type=int, default=1234, help='Random seed')
+    args = parser.parse_args()
+
     print("MNIST Accuracy & Memory Test: Baseline vs SMO 8-bit Activations")
     print("=" * 60)
-    
+    print(f"Epochs: {args.epochs}  Seed: {args.seed}")
+
     print("\n[1/2] Running Baseline (Standard AdamW)...")
-    acc_base, time_base, mem_base = run_experiment(use_smo_activations=False)
+    acc_base, time_base, mem_base = run_experiment(use_smo_activations=False, epochs=args.epochs, seed=args.seed)
     
     print("\n[2/2] Running SMO 8-bit Activations + AdamW...")
-    acc_smo, time_smo, mem_smo = run_experiment(use_smo_activations=True)
+    acc_smo, time_smo, mem_smo = run_experiment(use_smo_activations=True, epochs=args.epochs, seed=args.seed)
     
     print("\n" + "="*70)
     print("COMPARISON RESULTS")
@@ -143,6 +164,7 @@ def main():
     print("-" * 70)
     print(f"{'Difference':<25} | {acc_smo - acc_base:>9.2f}% | {mem_saved:>10.2f} MB ({mem_perc:.1f}%) | {time_smo - time_base:+.2f}s")
     print("\nNote: Memory metrics require CUDA to be accurate.")
+
 
 if __name__ == "__main__":
     main()

@@ -1,119 +1,66 @@
 # TODO.md - ROADMAP Phases 2-4 Progress Tracker
 
-Proyecto: Continuar refactor/test/mejora SMO-Spatial per ROADMAP.
+## Current Status (2026-05-06)
 
-## Phase 2: Correctness And Measurement Baseline (COMPLETED 2026-05-05)
+- ✅ **Phase 2: Correctness/Measurement** — COMPLETE (2026-05-05)
+- 🔄 **Phase 3: Bottleneck Analysis** — PROFILE SCRIPT READY, awaiting GPU (<50% utilization)
+- ✅ **Phase 4.1: Buffer Reuse** — COMPLETE (8-24% CPU speedup)
 
-### Deliverables Completed
+---
 
-#### 1. Timing Infrastructure ✅
-- `benchmarks/timing.py`: `measure_steps()` + `get_sync_fn(device)`
-- Supports CPU/CUDA/DirectML synchronization
-- Wall-clock and process CPU time recording
+## Phase 2 Complete ✅
 
-#### 2. Optimizer-Step Microbench ✅
-- `benchmarks/suites/optimizer_step/benchmark_step_time.py`:
-  - Shapes: 64×64 → 4096×4096 (7 configs)
-  - Multi-seed support (`--seeds`, default 3): mean±std
-  - Device-aware (`--device`): CPU/CUDA/DirectML
-  - CUDA memory reporting (allocated/reserved)
-  - Warmup configurable (`--warmup`)
-  - GPU DirectML path prepared (commented pending hardware)
+Infrastructure: seeding policy, multi-seed microbench, timing helpers, end-to-end baselines (MNIST 89.1% mem savings, +0.14% acc gap).
 
-#### 3. Correctness Tests ✅
-- `tests/test_spatial_optimizers.py`: 3/3 pass
-  - second moment tracks E[g²] ✅
-  - SMO vs SMO8bit exact match with `block_size=1` ✅
-  - rejects sparse gradients ✅
+## Phase 3 Prep: Profiling Suite ✅ (2026-05-06)
 
-#### 4. End-to-End Baselines ✅
-All use deterministic seeds and record them in results:
-- `benchmarks/suites/training/benchmark_mnist.py`:
-  - Adam: 99.04% acc, 3.22 MB, 331.35s
-  - SMO k=0.25: 98.90% acc, 0.35 MB, 325.80s → **89.1% memory reduction**, +0.14% acc gap
-  - SMO k=0.5: 99.13% acc, 0.92 MB
-  - Results: `benchmarks/results/benchmark_results.json`
-- `benchmarks/suites/training/benchmark_8bit.py`: SMO-8bit vs SMO vs Adam on MNIST (seed=1234)
-- `benchmarks/suites/training/benchmark_cifar10.py`: SMO vs Adam on CIFAR-10 (seed=1234)
-- `benchmarks/suites/spectral/benchmark_spectral_cpu.py`: Spectral variants vs Adam (seed=1234)
+**Added:** `profiles/profile_smo_step.py`
 
-#### 5. Activation Benchmark ✅
-- `benchmarks/suites/activations/benchmark_activations.py`:
-  - Multi-seed (`--seeds`, default 3): mean±std
-  - Device-aware (`--device`): CPU/CUDA
-  - Timing and memory (CUDA only) aggregation
+Features:
+- Manual timer breakdown (compress / update_compressed / upsample / full_step)
+- `torch.profiler` integration for kernel traces (JSON export)
+- CPU + CUDA support
+- Configurable shape, k_ratio, steps, warmup, seed
 
-### Phase 2 Exit Criteria Status
-
-- ✅ Benchmark runs are repeatable (all major suites fix seed)
-- ✅ Metrics defined consistently across hardware (infrastructure in place)
-- ⚠️ GPU execution pending: DirectML machine at 90%+ utilization (will enable when <50%)
-
-### Files Modified (Phase 2)
-
+**Sample output** (512×512, k=0.25, CPU):
 ```
-benchmarks/timing.py                           # get_sync_fn()
-benchmarks/suites/optimizer_step/benchmark_step_time.py  # multi-shape, multi-seed, device-aware
-benchmarks/suites/training/benchmark_mnist.py   # seed handling + results JSON
-benchmarks/suites/training/benchmark_cifar10.py # seed + argparse + results JSON
-benchmarks/suites/training/benchmark_8bit.py    # seed + argparse + results JSON
-benchmarks/suites/spectral/benchmark_spectral_cpu.py  # set_seed + argparse + results
-benchmarks/suites/activations/benchmark_activations.py  # multi-seed aggregation
-docs/ROADMAP.md                                # Phase 2 status updated
-TODO.md                                        # progress tracking
+compress            : mean=3.7482 ms
+update_compressed   : mean=0.2583 ms
+upsample            : mean=2.8164 ms
+full_step           : mean=9.0570 ms
 ```
 
-## Phase 3: Bottleneck Analysis (BLOCKED → GPU)
+**Interpretation:**
+- Compression (pooling) ≈ 41% of step time
+- Upsampling (bilinear interpolate) ≈ 31%
+- Elementwise update ≈ 3%
+- Overhead / weight update ≈ 25%
 
-**Status:** Awaiting GPU availability (local DirectML at >90% for days)
+**Next:** Run on GPU (DirectML) when device < 50% load to get accurate kernel-level timings and memory breakdown.
 
-**Plan when GPU frees:**
-1. Profile SMO-Spatial step with `torch.profiler` on CUDA/DirectML
-2. Isolate: pooling (compress) vs interpolation (upsample) vs quantization (8bit)
-3. Memory snapshot: allocation patterns, peak memory breakdown
-4. Identify top 3 hotspots
-5. Feed findings into Phase 4 optimization work
+## Phase 4.1 Buffer Reuse ✅ (2026-05-05)
 
-**Current hypotheses (from ROADMAP):**
-- 8-bit quantize/dequantize overhead
-- Full-resolution reconstruction for update application
-- Remaining PyTorch tensor allocation overhead in update path
+Pre-allocated intermediate buffers per-parameter; eliminated per-step allocations.
+Speedup: 8-24% depending on tensor shape (larger → smaller % gain).
 
-## Phase 4: Optimization Work (READY → after Phase 3 profiling)
+---
 
-**Priority queue:**
-1. SMO-Spatial: tensor reuse in update path (m_rec, v_rec buffers)
-2. SMO-Spatial-8bit: minimize dequant→update→requant round-trips
-3. Triton kernels: only after PyTorch path clean
-4. Activation compression: separate track
+## Completed Script Updates (Seeding)
 
-## Phase 5: Benchmark Publication (pending)
+All canonical benchmarks now expose `--seed` / `--seeds`:
+- `benchmark_step_time.py` (microbench) — multi-seed default 3
+- `benchmark_mnist.py`, `benchmark_cifar10.py`, `benchmark_8bit.py` — end-to-end, seed=1234 default
+- `benchmark_spectral_cpu.py` — end-to-end, seed=1234
+- `benchmark_minillm.py` — smoke/end-to-end, seed=1234
+- `benchmark_activations.py` — microbench, multi-seed default 3
+- `test_accuracy_activations.py`, `test_accuracy_delta.py` — end-to-end, seed=1234
+- `smoke_spatial_consistency.py` — smoke, seed=1234
 
-**Needed:**
-- Multi-seed tables (mean±std across 3+ seeds)
-- Hardware disclosure docs
-- Dataset/hyperparameter disclosures
-- Failure mode discussion
+---
 
-## Phase 6: Packaging & Documentation (pending)
+## Next Actions
 
-**Needed:**
-- Public API cleanup
-- Examples notebook
-- Reproducibility guide
-- Changelog and versioning
-
-## Next Actions (Immediate)
-
-1. ⏸ Wait for GPU availability to start Phase 3 profiling
-2. 📝 Document seed policy in `benchmarks/METHODOLOGY.md` (explain default seeds, reproducibility)
-3. 🔬 Once GPU free: run profiling suite on SMO-Spatial (CPU baseline already stable)
-4. 🎯 After profiling: implement alloc optimization in `smo/optimizers/spatial.py`
-
-## Notes
-
-- All end-to-end benchmarks now save results via `write_benchmark_bundle()` to `benchmarks/results/`
-- CATALOG.md already tracks all canonical suites; status=canonical verified
-- No code changes to legacy wrappers required; they forward to updated suites
-
-Last update: 2026-05-05
+1. **Pending low-priority:** Add `--seed` to diagnostic scripts (`debug_accuracy_drop.py`, `benchmark_dct_fix.py`) — optional
+2. **Blocked:** GPU profiling run (Phase 3) when DirectML available
+3. **After profiling:** Implement Phase 4.2 (pooling kernel optimization or conditional upsampling bypass)
+4. **Documentation:** Update CHANGELOG.md with buffer reuse metrics and profiling tool

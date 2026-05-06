@@ -5,18 +5,35 @@ Tests the hypothesis that dense Linear weights in Transformers can be treated
 as "textures" and spatially/spectrally compressed without destroying attention logic.
 """
 
+import argparse
 import math
+import sys
 import time
+import random
+import numpy as np
+from pathlib import Path
+
+# Add project root
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from benchmarks._paths import add_project_root_to_path
+add_project_root_to_path()
+
 # Benchmark classification: family=end_to_end_training, category=smoke, status=canonical
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from smo import SMO
-from smo.optim_8bit import SMO8bit
+from smo.optimizers.spatial_8bit import SMO8bit
 from benchmarks.results_utils import make_run_record, write_benchmark_bundle
 
-# Optional: Add SMODCT if it's fully implemented
-HAS_DCT = False
+
+def set_seed(seed: int):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
 
 # -----------------------------------------------------------------------------
 # 1. Mini-LLM Architecture (NanoGPT style)
@@ -134,13 +151,14 @@ def get_batch(split, data, block_size, batch_size, device):
 # -----------------------------------------------------------------------------
 # 3. Experiment Runner
 # -----------------------------------------------------------------------------
-def run_experiment(optimizer_name, optimizer_fn, max_iters=500, device='cpu'):
+def run_experiment(optimizer_name, optimizer_fn, max_iters=500, device='cpu', seed=1234):
+    set_seed(seed)
+    
     print(f"\n{'='*60}")
-    print(f"Running: {optimizer_name}")
+    print(f"Running: {optimizer_name} (seed={seed})")
     print(f"{'='*60}")
     
-    # Synthetic data generation (random tokens) to serve as a skeleton test
-    # In a real scenario, this would load TinyShakespeare
+    # Synthetic data generation (random tokens)
     vocab_size = GPTConfig.vocab_size
     train_data = torch.randint(0, vocab_size, (10000,))
     val_data = torch.randint(0, vocab_size, (1000,))
@@ -166,7 +184,8 @@ def run_experiment(optimizer_name, optimizer_fn, max_iters=500, device='cpu'):
         'optimizer': optimizer_name,
         'parameters': param_count,
         'iters': [],
-        'train_time': 0
+        'train_time': 0,
+        'seed': seed,
     }
     
     model.train()
@@ -220,21 +239,29 @@ def run_experiment(optimizer_name, optimizer_fn, max_iters=500, device='cpu'):
 # 4. Main
 # -----------------------------------------------------------------------------
 def main():
+    parser = argparse.ArgumentParser(description="SMO variants vs AdamW on MiniGPT (smoke test)")
+    parser.add_argument('--max_iters', type=int, default=200, help='Maximum training iterations')
+    parser.add_argument('--seed', type=int, default=1234, help='Random seed for reproducibility')
+    args = parser.parse_args()
+
     device = 'cpu'
-    max_iters = 200 # Short run for skeleton testing
+    max_iters = args.max_iters
+    seed = args.seed
     
     print("="*60)
     print("LLM Benchmark: SMO variants vs AdamW on Mini-GPT")
     print("="*60)
     print(f"Device: {device}")
     print(f"Max Iters: {max_iters}")
+    print(f"Seed: {seed}")
     
     # 1. Baseline AdamW
     results_adam = run_experiment(
         "Standard AdamW",
         lambda params: torch.optim.AdamW(params, lr=1e-3, weight_decay=1e-2),
         max_iters=max_iters,
-        device=device
+        device=device,
+        seed=seed
     )
     
     # 2. SMO (Spatial)
@@ -242,7 +269,8 @@ def main():
         "SMO (k_ratio=0.5)",
         lambda params: SMO(params, lr=1e-3, weight_decay=1e-2, k_ratio=0.5),
         max_iters=max_iters,
-        device=device
+        device=device,
+        seed=seed
     )
     
     # 3. SMO-8bit (Extreme Compression)
@@ -250,7 +278,8 @@ def main():
         "SMO-8bit (k_ratio=0.5)",
         lambda params: SMO8bit(params, lr=1e-3, weight_decay=1e-2, k_ratio=0.5),
         max_iters=max_iters,
-        device=device
+        device=device,
+        seed=seed
     )
     
     # Summary
@@ -266,7 +295,7 @@ def main():
         print(f"\n{r['optimizer']}:")
         print(f"  Final Val Perplexity: {ppl:.2f}")
         print(f"  Optimizer Memory:     {mem:.2f} MB")
-        
+    
     # Save results
     out_dict = {
         'adamw': results_adam,
@@ -285,6 +314,7 @@ def main():
             batch_size=16,
             precision="fp32",
             steps=max_iters,
+            seed=seed,
             metrics={
                 "final_val_loss": results_adam['final_val_loss'],
                 "final_val_perplexity": results_adam['final_val_perplexity'],
@@ -304,6 +334,7 @@ def main():
             batch_size=16,
             precision="fp32",
             steps=max_iters,
+            seed=seed,
             metrics={
                 "final_val_loss": results_smo['final_val_loss'],
                 "final_val_perplexity": results_smo['final_val_perplexity'],
@@ -323,6 +354,7 @@ def main():
             batch_size=16,
             precision="fp32",
             steps=max_iters,
+            seed=seed,
             metrics={
                 "final_val_loss": results_8bit['final_val_loss'],
                 "final_val_perplexity": results_8bit['final_val_perplexity'],
@@ -340,6 +372,7 @@ def main():
         runs=runs,
     )
     print(f"\nResults saved to {results_path}")
+
 
 if __name__ == '__main__':
     main()

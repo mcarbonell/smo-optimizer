@@ -7,23 +7,35 @@ Trains a simple CNN on MNIST to compare:
 3. AdamW + SMO Delta-Encoded Activations (stored as float16)
 """
 
-# Benchmark classification: family=activation_memory, category=end_to_end, status=canonical
+import argparse
+import sys
+from pathlib import Path
+import time
+import random
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
-import time
-import os
-import sys
 
+# Add project root
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from benchmarks._paths import add_project_root_to_path
-
 add_project_root_to_path()
 
 from smo.activations_8bit import wrap_model_activations
 from smo.activations_delta import wrap_model_delta
+
+
+def set_seed(seed: int):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
 
 class SimpleCNN(nn.Module):
     def __init__(self):
@@ -49,6 +61,7 @@ class SimpleCNN(nn.Module):
         x = self.fc2(x)
         return x
 
+
 def train(model, device, train_loader, optimizer, epoch):
     model.train()
     total_loss = 0
@@ -61,6 +74,7 @@ def train(model, device, train_loader, optimizer, epoch):
         optimizer.step()
         total_loss += loss.item()
     return total_loss / len(train_loader)
+
 
 def test(model, device, test_loader):
     model.eval()
@@ -77,10 +91,19 @@ def test(model, device, test_loader):
     accuracy = 100. * correct / len(test_loader.dataset)
     return test_loss, accuracy
 
-def run_experiment(mode="baseline"):
-    torch.manual_seed(42)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+def measure_memory_usage():
+    if torch.cuda.is_available():
+        return torch.cuda.max_memory_allocated() / (1024 ** 2)
+    return 0
+
+
+def run_experiment(mode="baseline", epochs=1, device='cpu', seed=1234):
+    set_seed(seed)
     
+    if torch.cuda.is_available():
+        torch.cuda.reset_peak_memory_stats()
+
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,))
@@ -93,16 +116,16 @@ def run_experiment(mode="baseline"):
     test_loader = DataLoader(test_dataset, batch_size=1000, shuffle=False)
     
     model = SimpleCNN().to(device)
-    if mode == "8bit":
+    
+    if mode == "smo_8bit":
         print("Applying SMO 8-bit Activation Wrapping...")
         model = wrap_model_activations(model, block_size=64)
-    elif mode == "delta":
-        print("Applying SMO Delta Activation Wrapping...")
+    elif mode == "smo_delta":
+        print("Applying SMO Delta-Encoded Activation Wrapping...")
         model = wrap_model_delta(model)
     
     optimizer = optim.AdamW(model.parameters(), lr=1e-3)
     
-    epochs = 1
     print(f"Training for {epochs} epoch(s)...")
     
     start_time = time.time()
@@ -112,30 +135,44 @@ def run_experiment(mode="baseline"):
         print(f"Epoch {epoch}: Loss: {loss:.4f}, Test Acc: {accuracy:.2f}%")
     
     total_time = time.time() - start_time
-    return accuracy, total_time
+    peak_mem = measure_memory_usage()
+    
+    return accuracy, total_time, peak_mem
+
 
 def main():
-    print("MNIST Comparison: Baseline vs 8-bit vs Delta Activations")
-    print("=" * 65)
-    
+    parser = argparse.ArgumentParser(description="Delta vs 8-bit activation accuracy test on MNIST")
+    parser.add_argument('--epochs', type=int, default=1, help='Number of training epochs')
+    parser.add_argument('--seed', type=int, default=1234, help='Random seed')
+    args = parser.parse_args()
+
+    print("MNIST Accuracy & Memory Test: Baseline vs SMO 8-bit vs SMO Delta")
+    print("=" * 60)
+    print(f"Epochs: {args.epochs}  Seed: {args.seed}")
+
+    # 1. Baseline
     print("\n[1/3] Running Baseline (Standard AdamW)...")
-    acc_base, time_base = run_experiment("baseline")
+    acc_base, time_base, mem_base = run_experiment(mode="baseline", epochs=args.epochs, seed=args.seed)
     
-    print("\n[2/3] Running SMO 8-bit Activations...")
-    acc_8bit, time_8bit = run_experiment("8bit")
+    # 2. SMO 8-bit Activations
+    print("\n[2/3] Running SMO 8-bit Activations + AdamW...")
+    acc_8bit, time_8bit, mem_8bit = run_experiment(mode="smo_8bit", epochs=args.epochs, seed=args.seed)
     
-    print("\n[3/3] Running SMO Delta Activations (FP16)...")
-    acc_delta, time_delta = run_experiment("delta")
+    # 3. SMO Delta
+    print("\n[3/3] Running SMO Delta-Encoded Activations + AdamW...")
+    acc_delta, time_delta, mem_delta = run_experiment(mode="smo_delta", epochs=args.epochs, seed=args.seed)
     
     print("\n" + "="*70)
-    print("ACCURACY & TIME COMPARISON")
+    print("COMPARISON RESULTS")
     print("="*70)
-    print(f"{'Configuration':<25} | {'Accuracy':<10} | {'Time'}")
+    print(f"{'Configuration':<25} | {'Accuracy':<10} | {'Memory (Peak)':<15} | {'Time'}")
     print("-" * 70)
-    print(f"{'Standard AdamW':<25} | {acc_base:>9.2f}% | {time_base:.2f}s")
-    print(f"{'SMO 8-bit':<25} | {acc_8bit:>9.2f}% | {time_8bit:.2f}s")
-    print(f"{'SMO Delta (FP16)':<25} | {acc_delta:>9.2f}% | {time_delta:.2f}s")
-    print("-" * 70)
+    print(f"{'Standard AdamW':<25} | {acc_base:>9.2f}% | {mem_base:>10.2f} MB | {time_base:.2f}s")
+    print(f"{'SMO 8-bit Activations':<25} | {acc_8bit:>9.2f}% | {mem_8bit:>10.2f} MB | {time_8bit:.2f}s")
+    print(f"{'SMO Delta Encoded':<25} | {acc_delta:>9.2f}% | {mem_delta:>10.2f} MB | {time_delta:.2f}s")
+    
+    print("\nNote: Memory metrics require CUDA to be accurate.")
+
 
 if __name__ == "__main__":
     main()
