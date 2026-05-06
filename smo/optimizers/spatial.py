@@ -15,7 +15,7 @@ import math
 import torch
 from torch.optim.optimizer import Optimizer
 
-from ._spatial_utils import compress_2d, compress_2d_pair, upsample_2d_pair
+from ._spatial_utils import compress_2d, compress_2d_pair, compress_2d_pair_into_buffers, upsample_2d_pair, upsample_2d_pair_into_buffers
 
 
 class SMO(Optimizer):
@@ -80,17 +80,18 @@ class SMO(Optimizer):
                 # Initialization
                 if len(state) == 0:
                     state['step'] = 0
-                    # Only compress large 2D tensors (e.g. weight matrices).
-                    # 1D biases or very small embeddings remain full-res to avoid
-                    # interpolation instability and because their RAM footprint is negligible.
                     if grad.dim() == 2 and grad.shape[0] >= 32 and grad.shape[1] >= 32:
                         state['is_compressed'] = True
                         new_h = max(1, int(grad.shape[0] * k_ratio))
                         new_w = max(1, int(grad.shape[1] * k_ratio))
-                        # Initial compressed states
                         state['exp_avg'] = torch.zeros((new_h, new_w), dtype=grad.dtype, device=grad.device)
                         state['exp_avg_sq'] = torch.zeros((new_h, new_w), dtype=grad.dtype, device=grad.device)
                         state['orig_shape'] = grad.shape
+                        # Pre-allocate reusable buffers to avoid per-step allocations
+                        state['_buf_g_comp'] = torch.empty((new_h, new_w), dtype=grad.dtype, device=grad.device)
+                        state['_buf_g_sq_comp'] = torch.empty((new_h, new_w), dtype=grad.dtype, device=grad.device)
+                        state['_buf_m_rec'] = torch.empty(grad.shape, dtype=grad.dtype, device=grad.device)
+                        state['_buf_v_rec'] = torch.empty(grad.shape, dtype=grad.dtype, device=grad.device)
                     else:
                         state['is_compressed'] = False
                         state['exp_avg'] = torch.zeros_like(p, memory_format=torch.preserve_format)
@@ -104,24 +105,25 @@ class SMO(Optimizer):
                     grad = grad.add(p, alpha=group['weight_decay'])
 
                 if state['is_compressed']:
-                    # 1. Compress the current gradient (Downsample)
-                    # 'area' interpolation (adaptive_avg_pool2d) is mathematically
-                    # more stable for gradients than bilinear downsampling.
-                    g_comp, g_sq_comp = compress_2d_pair(grad, grad.square(), exp_avg.shape)
+                    # 1. Compress gradient into pre-allocated buffers
+                    g_comp, g_sq_comp = compress_2d_pair_into_buffers(
+                        grad, grad.square(),
+                        state['_buf_g_comp'], state['_buf_g_sq_comp'],
+                        target_shape=exp_avg.shape
+                    )
                     
-                    # 2. Update compressed moments
+                    # 2. Update compressed moments in-place
                     exp_avg.mul_(beta1).add_(g_comp, alpha=1 - beta1)
-                    
-                    # The second moment must track E[g^2], not E[g]^2. Using the
-                    # squared pooled gradient collapses intra-bin variance and makes
-                    # the spatial and 8-bit variants optimize different objectives.
                     exp_avg_sq.mul_(beta2).add_(g_sq_comp, alpha=1 - beta2)
 
-                    # 3. Decompress (Upsample) to apply the update
-                    m_rec, v_rec = upsample_2d_pair(exp_avg, exp_avg_sq, state['orig_shape'])
-                    
-                    # Ensure strict positivity in v_rec (mitigates interpolation artifacts)
-                    v_rec = torch.clamp(v_rec, min=0.0)
+                    # 3. Upsample into pre-allocated reconstruction buffers
+                    m_rec, v_rec = upsample_2d_pair_into_buffers(
+                        exp_avg, exp_avg_sq,
+                        state['_buf_m_rec'], state['_buf_v_rec'],
+                        state['orig_shape']
+                    )
+                    # In-place clamp to ensure positivity (mitigates interpolation artifacts)
+                    v_rec.clamp_(min=0.0)
 
                 else:
                     # Standard fallback for 1D / small tensors

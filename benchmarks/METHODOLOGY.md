@@ -143,9 +143,17 @@ Never compare two optimizers with different training recipes unless the benchmar
 
 ### Rule 2
 
-Run at least 3 seeds for any result that will be shown publicly.
+Run at least **3 seeds** for any result that will be shown publicly.
 
 For stronger claims, use 5 seeds.
+
+**Seeding defaults:**
+- Microbenchmarks: 3 seeds (default: 1234, 5678, 9012)
+- End-to-end training: 1 seed by default (due to cost), but must be explicitly specified via `--seed` and recorded in results
+- Activation benchmarks: 3 seeds (aggregated mean±std)
+
+**Reproducibility:**
+Every benchmark script must expose `--seed` (and `--seeds` for multi-seed aggregation) and must write the seed value into the results JSON.
 
 ### Rule 3
 

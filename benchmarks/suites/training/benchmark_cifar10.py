@@ -4,16 +4,29 @@ Benchmark: SMO (SWO) vs Standard Adam on CIFAR-10.
 A more challenging test than MNIST for validation.
 """
 
+import argparse
+import sys
+import time
+import random
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
-import time
+
 # Benchmark classification: family=end_to_end_training, category=end_to_end, status=canonical
 from smo import SMO
 from benchmarks._paths import DATA_DIR
 from benchmarks.results_utils import make_run_record, write_benchmark_bundle
+
+
+def set_seed(seed: int):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
 
 class CIFAR_CNN(nn.Module):
@@ -94,9 +107,11 @@ def evaluate(model, loader, device):
     return 100.0 * correct / total
 
 
-def run_experiment(optimizer_name, optimizer_fn, epochs=5, device='cpu'):
+def run_experiment(optimizer_name, optimizer_fn, epochs=5, device='cpu', seed=1234):
+    set_seed(seed)
+    
     print(f"\n{'='*60}")
-    print(f"Running: {optimizer_name}")
+    print(f"Running: {optimizer_name} (seed={seed})")
     print(f"{'='*60}")
     
     transform_train = transforms.Compose([
@@ -128,7 +143,8 @@ def run_experiment(optimizer_name, optimizer_fn, epochs=5, device='cpu'):
         'optimizer': optimizer_name,
         'parameters': param_count,
         'epochs': [],
-        'train_time': 0
+        'train_time': 0,
+        'seed': seed,
     }
     
     start_time = time.time()
@@ -167,35 +183,45 @@ def run_experiment(optimizer_name, optimizer_fn, epochs=5, device='cpu'):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="SMO vs Adam benchmark on CIFAR-10")
+    parser.add_argument('--epochs', type=int, default=5, help='Number of training epochs')
+    parser.add_argument('--seed', type=int, default=1234, help='Random seed for reproducibility')
+    args = parser.parse_args()
+
     device = 'cpu'
-    epochs = 5
+    epochs = args.epochs
+    seed = args.seed
     
     print("="*60)
-    print("SWO Benchmark: SMO vs Standard Adam on CIFAR-10")
+    print(f"SWO Benchmark: SMO vs Standard Adam on CIFAR-10")
     print("="*60)
     print(f"Device: {device}")
     print(f"Epochs: {epochs}")
+    print(f"Seed: {seed}")
     print("WARNING: On CPU this takes ~60-90 minutes total. Be patient.")
     
     results_adam = run_experiment(
         "Standard Adam",
         lambda params: torch.optim.Adam(params, lr=1e-3),
         epochs=epochs,
-        device=device
+        device=device,
+        seed=seed
     )
     
     results_swo = run_experiment(
         "SMO (k_ratio=0.25)",
         lambda params: SMO(params, lr=1e-3, k_ratio=0.25),
         epochs=epochs,
-        device=device
+        device=device,
+        seed=seed
     )
     
     results_swo_50 = run_experiment(
         "SMO (k_ratio=0.5)",
         lambda params: SMO(params, lr=1e-3, k_ratio=0.5),
         epochs=epochs,
-        device=device
+        device=device,
+        seed=seed
     )
     
     print("\n" + "="*60)
@@ -256,6 +282,7 @@ def main():
             batch_size=128,
             precision="fp32",
             epochs=epochs,
+            seed=seed,
             metrics={
                 "final_accuracy": results_adam['final_test_acc'],
                 "optimizer_state_mb": results_adam['optimizer_memory_mb'],
@@ -274,6 +301,7 @@ def main():
             batch_size=128,
             precision="fp32",
             epochs=epochs,
+            seed=seed,
             metrics={
                 "final_accuracy": results_swo['final_test_acc'],
                 "optimizer_state_mb": results_swo['optimizer_memory_mb'],
@@ -292,6 +320,7 @@ def main():
             batch_size=128,
             precision="fp32",
             epochs=epochs,
+            seed=seed,
             metrics={
                 "final_accuracy": results_swo_50['final_test_acc'],
                 "optimizer_state_mb": results_swo_50['optimizer_memory_mb'],

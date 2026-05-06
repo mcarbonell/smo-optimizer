@@ -4,10 +4,12 @@ Benchmark: SMO (Spatial) vs SMOWalsh vs SMODCT on CIFAR-10 (CPU).
 """
 
 import os
-# Benchmark classification: family=end_to_end_training, category=end_to_end, status=canonical
 import sys
 import time
 import json
+import argparse
+import random
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -23,6 +25,14 @@ from spectral.optim_walsh import SMOWalsh
 from spectral.optim_dct import SMODCT
 from spectral.optim_walsh_pure import SMOWalshPure
 from spectral.optim_dct_pure import SMODCTPure
+
+
+def set_seed(seed: int):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
 class CIFAR_CNN(nn.Module):
     def __init__(self):
@@ -93,9 +103,12 @@ def evaluate(model, loader, device):
             total += target.size(0)
     return 100.0 * correct / total
 
-def run_experiment(optimizer_name, optimizer_fn, epochs=3, device='cpu'):
+def run_experiment(optimizer_name, optimizer_fn, epochs=3, device='cpu', seed=1234):
+    """Run full training with deterministic seeding."""
+    set_seed(seed)
+    
     print(f"\n{'='*60}")
-    print(f"Running: {optimizer_name}")
+    print(f"Running: {optimizer_name} (seed={seed})")
     print(f"{'='*60}")
     
     transform_train = transforms.Compose([
@@ -147,6 +160,7 @@ def run_experiment(optimizer_name, optimizer_fn, epochs=3, device='cpu'):
     results['total_time'] = round(total_time, 2)
     results['optimizer_memory_mb'] = round(opt_mem, 2)
     results['final_test_acc'] = results['epochs'][-1]['test_acc']
+    results['seed'] = seed  # deterministic seeding
     
     print(f"\nFinal Results:")
     print(f"  Total training time: {total_time:.2f}s")
@@ -156,18 +170,24 @@ def run_experiment(optimizer_name, optimizer_fn, epochs=3, device='cpu'):
     return results
 
 def main():
+    parser = argparse.ArgumentParser(description="Spectral optimizers benchmark on CIFAR-10 (CPU)")
+    parser.add_argument('--epochs', type=int, default=3, help='Number of training epochs')
+    parser.add_argument('--seed', type=int, default=1234, help='Random seed for reproducibility')
+    args = parser.parse_args()
+
     device = 'cpu'
-    epochs = 3
+    epochs = args.epochs
+    seed = args.seed
     
     print("="*60)
-    print("Spectral Optimizers CPU Benchmark (3 Epochs)")
+    print(f"Spectral Optimizers CPU Benchmark ({epochs} Epochs, seed={seed})")
     print("="*60)
     
-    res_adam = run_experiment("Standard AdamW", lambda p: torch.optim.AdamW(p, lr=1e-3), epochs, device)
-    res_walsh_pure = run_experiment("SMOWalsh (Pure FWHT) k=0.5", lambda p: SMOWalshPure(p, lr=1e-3, k_ratio=0.5), epochs, device)
-    res_dct_pure = run_experiment("SMODCT (Pure) k=0.5", lambda p: SMODCTPure(p, lr=1e-3, k_ratio=0.5), epochs, device)
-    res_walsh = run_experiment("SMOWalsh (Hybrid) k=0.5", lambda p: SMOWalsh(p, lr=1e-3, k_ratio=0.5), epochs, device)
-    res_dct = run_experiment("SMODCT (Hybrid) k=0.5", lambda p: SMODCT(p, lr=1e-3, k_ratio=0.5), epochs, device)
+    res_adam = run_experiment("Standard AdamW", lambda p: torch.optim.AdamW(p, lr=1e-3), epochs, device, seed)
+    res_walsh_pure = run_experiment("SMOWalsh (Pure FWHT) k=0.5", lambda p: SMOWalshPure(p, lr=1e-3, k_ratio=0.5), epochs, device, seed)
+    res_dct_pure = run_experiment("SMODCT (Pure) k=0.5", lambda p: SMODCTPure(p, lr=1e-3, k_ratio=0.5), epochs, device, seed)
+    res_walsh = run_experiment("SMOWalsh (Hybrid) k=0.5", lambda p: SMOWalsh(p, lr=1e-3, k_ratio=0.5), epochs, device, seed)
+    res_dct = run_experiment("SMODCT (Hybrid) k=0.5", lambda p: SMODCT(p, lr=1e-3, k_ratio=0.5), epochs, device, seed)
     
     print("\n" + "="*60)
     print("COMPARISON SUMMARY (3 EPOCHS)")

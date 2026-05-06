@@ -56,6 +56,39 @@ def compress_2d_pair(
     return pooled[0], pooled[1]
 
 
+def compress_2d_pair_into_buffers(
+    tensor_a: torch.Tensor,
+    tensor_b: torch.Tensor,
+    out_a: torch.Tensor,
+    out_b: torch.Tensor,
+    target_shape: tuple[int, int],
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Compress two 2D tensors into pre-allocated output buffers.
+    Returns (out_a, out_b) for convenience.
+    """
+    if tensor_a.shape != tensor_b.shape:
+        raise ValueError("compress_2d_pair expects matching input shapes")
+    if out_a.shape != target_shape or out_b.shape != target_shape:
+        raise ValueError("output buffers must match target_shape")
+
+    height, width = tensor_a.shape
+    stacked = torch.stack((tensor_a, tensor_b), dim=0).unsqueeze(0)
+
+    if _can_use_exact_pool((height, width), target_shape):
+        target_h, target_w = target_shape
+        kernel_h = height // target_h
+        kernel_w = width // target_w
+        pooled = F.avg_pool2d(stacked, kernel_size=(kernel_h, kernel_w), stride=(kernel_h, kernel_w))
+    else:
+        pooled = F.adaptive_avg_pool2d(stacked, target_shape)
+
+    pooled = pooled.squeeze(0)
+    out_a.copy_(pooled[0])
+    out_b.copy_(pooled[1])
+    return out_a, out_b
+
+
 def upsample_2d_pair(
     tensor_a: torch.Tensor,
     tensor_b: torch.Tensor,
@@ -74,3 +107,34 @@ def upsample_2d_pair(
     stacked = torch.stack((tensor_a, tensor_b), dim=0).unsqueeze(0)
     upsampled = F.interpolate(stacked, size=target_shape, mode=mode, align_corners=align_corners).squeeze(0)
     return upsampled[0], upsampled[1]
+
+
+def upsample_2d_pair_into_buffers(
+    tensor_a: torch.Tensor,
+    tensor_b: torch.Tensor,
+    out_a: torch.Tensor,
+    out_b: torch.Tensor,
+    target_shape: tuple[int, int],
+    *,
+    mode: str = "bilinear",
+    align_corners: bool = False,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Upsample two 2D tensors into pre-allocated output buffers.
+    Returns (out_a, out_b) for convenience.
+    """
+    if tensor_a.shape != tensor_b.shape:
+        raise ValueError("upsample_2d_pair expects matching input shapes")
+    if out_a.shape != target_shape or out_b.shape != target_shape:
+        raise ValueError("output buffers must match target_shape")
+
+    if tensor_a.shape == target_shape:
+        out_a.copy_(tensor_a)
+        out_b.copy_(tensor_b)
+        return out_a, out_b
+
+    stacked = torch.stack((tensor_a, tensor_b), dim=0).unsqueeze(0)
+    upsampled = F.interpolate(stacked, size=target_shape, mode=mode, align_corners=align_corners).squeeze(0)
+    out_a.copy_(upsampled[0])
+    out_b.copy_(upsampled[1])
+    return out_a, out_b

@@ -4,17 +4,30 @@ Benchmark: SMO-8bit (Star Mode) vs SMO vs Standard Adam on MNIST.
 Tests the extreme memory compression combining spatial pooling + 8-bit quantization.
 """
 
+import argparse
+import sys
+import time
+import random
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
-import time
+
 # Benchmark classification: family=end_to_end_training, category=end_to_end, status=canonical
 from smo import SMO
-from smo.optim_8bit import SMO8bit
+from smo.optimizers.spatial_8bit import SMO8bit
 from benchmarks._paths import DATA_DIR
 from benchmarks.results_utils import make_run_record, write_benchmark_bundle
+
+
+def set_seed(seed: int):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
 
 class SimpleCNN(nn.Module):
@@ -87,10 +100,11 @@ def evaluate(model, loader, device):
     return 100.0 * correct / total
 
 
-def run_experiment(optimizer_name, optimizer_fn, epochs=5, device='cpu'):
-    """Run full training experiment with given optimizer factory."""
+def run_experiment(optimizer_name, optimizer_fn, epochs=5, device='cpu', seed=1234):
+    set_seed(seed)
+    
     print(f"\n{'='*60}")
-    print(f"Running: {optimizer_name}")
+    print(f"Running: {optimizer_name} (seed={seed})")
     print(f"{'='*60}")
     
     # Load MNIST
@@ -108,6 +122,7 @@ def run_experiment(optimizer_name, optimizer_fn, epochs=5, device='cpu'):
     # Model
     model = SimpleCNN().to(device)
     param_count = count_parameters(model)
+    print(f"Model parameters: {param_count:,}")
     
     # Optimizer
     optimizer = optimizer_fn(model.parameters())
@@ -122,7 +137,8 @@ def run_experiment(optimizer_name, optimizer_fn, epochs=5, device='cpu'):
         'optimizer': optimizer_name,
         'parameters': param_count,
         'epochs': [],
-        'train_time': 0
+        'train_time': 0,
+        'seed': seed,
     }
     
     start_time = time.time()
@@ -163,21 +179,29 @@ def run_experiment(optimizer_name, optimizer_fn, epochs=5, device='cpu'):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="SMO-8bit vs SMO vs Adam benchmark on MNIST")
+    parser.add_argument('--epochs', type=int, default=5, help='Number of training epochs')
+    parser.add_argument('--seed', type=int, default=1234, help='Random seed for reproducibility')
+    args = parser.parse_args()
+
     device = 'cpu'
-    epochs = 5
+    epochs = args.epochs
+    seed = args.seed
     
     print("="*60)
     print("SWO Benchmark: SMO-8bit vs SMO vs Standard Adam on MNIST")
     print("="*60)
     print(f"Device: {device}")
     print(f"Epochs: {epochs}")
+    print(f"Seed: {seed}")
     
     # Run Adam
     results_adam = run_experiment(
         "Standard Adam",
         lambda params: torch.optim.Adam(params, lr=1e-3),
         epochs=epochs,
-        device=device
+        device=device,
+        seed=seed
     )
     
     # Run SMO (k_ratio=0.25)
@@ -185,7 +209,8 @@ def main():
         "SMO (k_ratio=0.25) [Spatial Only]",
         lambda params: SMO(params, lr=1e-3, k_ratio=0.25),
         epochs=epochs,
-        device=device
+        device=device,
+        seed=seed
     )
     
     # Run SMO-8bit (k_ratio=0.25)
@@ -193,7 +218,8 @@ def main():
         "SMO-8bit (k_ratio=0.25) [Spatial + 8-bit Quantized]",
         lambda params: SMO8bit(params, lr=1e-3, k_ratio=0.25),
         epochs=epochs,
-        device=device
+        device=device,
+        seed=seed
     )
     
     # Summary
@@ -240,6 +266,7 @@ def main():
             batch_size=128,
             precision="fp32",
             epochs=epochs,
+            seed=seed,
             metrics={
                 "final_accuracy": results_adam['final_test_acc'],
                 "optimizer_state_mb": results_adam['optimizer_memory_mb'],
@@ -258,6 +285,7 @@ def main():
             batch_size=128,
             precision="fp32",
             epochs=epochs,
+            seed=seed,
             metrics={
                 "final_accuracy": results_smo['final_test_acc'],
                 "optimizer_state_mb": results_smo['optimizer_memory_mb'],
@@ -276,6 +304,7 @@ def main():
             batch_size=128,
             precision="fp32",
             epochs=epochs,
+            seed=seed,
             metrics={
                 "final_accuracy": results_smo_8bit['final_test_acc'],
                 "optimizer_state_mb": results_smo_8bit['optimizer_memory_mb'],
