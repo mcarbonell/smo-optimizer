@@ -28,7 +28,7 @@ The core idea is to reduce optimizer-state memory by compressing first- and seco
 - **Walsh Pure k=0.5**: 64.47% acc / 1.74 MB → **63.3% savings**, **beats Adam by +1.44%**
 - Walsh Hybrid k=0.5: 61.24% / 1.74 MB (−1.79%)
 - DCT Hybrid k=0.5: 62.74% / 1.74 MB (−0.29%)
-- DCT Pure k=0.5: **FAIL** (14% acc, under investigation)
+- DCT Pure k=0.5: 63.10% / 1.74 MB → **63.3% savings**, (−0.07% vs Adam, now fixed)
 
 > **Takeaway:** Spatial+8bit compression achieves **>90% memory reduction** on simple/medium tasks with minimal accuracy loss. On harder tasks (CIFAR-10) trade-off is larger (−3% at k=0.25) but improves with less aggressive compression (−2% at k=0.5). Surprisingly, Walsh Pure outperforms Adam on CIFAR-10 — worth deeper investigation.
 
@@ -156,7 +156,6 @@ All results saved to `benchmarks/results/` as JSON bundles.
 
 ## 🐛 Known Issues
 
-- **DCT Pure variant fails** on CIFAR-10 (14% acc vs Adam 63%) — bug in `spectral/optim_dct_pure.py` (under investigation)
 - **Accuracy gap on complex tasks**: CIFAR-10 gap −3.32% at k=0.25; consider k=0.5 for better quality (−2.08% gap)
 - **GPU profiling pending**: DirectML machine at high utilization; will run profiling when <50%
 

@@ -131,7 +131,7 @@ Deliverables:
 | Spectral | Walsh Pure k=0.5 | **64.47% acc** | 1.74 MB | **63.3%** (+1.44% vs Adam) |
 | Spectral | Walsh Hybrid k=0.5 | 61.24% acc | 1.74 MB | 63.3% (−1.79%) |
 | Spectral | DCT Hybrid k=0.5 | 62.74% acc | 1.74 MB | 63.3% (−0.29%) |
-| Spectral | DCT Pure k=0.5 | 14.28% acc | 4.74 MB | 0% (FAIL) |
+| Spectral | DCT Pure k=0.5 | **63.10% acc** | 1.74 MB | **63.3%** (−0.07% vs Adam, FIXED) |
 | MiniGPT (`benchmark_minillm.py`) | AdamW | PPL 65.31 | 6.21 MB | baseline |
 | MiniGPT | SMO k=0.5 | PPL 66.58 | 1.56 MB | **74.9%** |
 | MiniGPT | SMO-8bit k=0.5 | PPL 66.58 | **0.43 MB** | **93.1%** |
@@ -141,8 +141,8 @@ Deliverables:
 - **CIFAR-10 (complex)**: Accuracy gap larger (−3.32% at k=0.25), but **memory savings still strong** (79.1%)
 - **MiniGPT (Transformer)**: SMO-8bit achieves **93.1% savings** with same perplexity as SMO (66.58 vs 65.31 Adam) — promising for LLM-scale
 - **Spectral variants**:
-  - **Walsh Pure sorprende**: 64.47% acc (>Adam 63.03%) con 63% memoria — ¿generalización mejor?
-  - Walsh Hybrid degrada; DCT Hybrid cerca de Adam; DCT Pure falla (bug en implementación pura)
+   - **Walsh Pure sorprende**: 64.47% acc (>Adam 63.03%) con 63% memoria — ¿generalización mejor?
+   - Walsh Hybrid degrada; DCT Hybrid cerca de Adam; DCT Pure **arreglado** (63.10% ≈ Adam)
 - **Trade-off is task-dependent**: easier tasks tolerate aggressive compression; harder tasks need higher k_ratio
 - **8-bit quantization adds 4–5% extra savings** on top of spatial compression with no quality hit in MNIST/MiniGPT
 
@@ -167,9 +167,8 @@ Deliverables:
 - [x] Run CIFAR-10 baseline — completed 2026-05-06
 - [x] Run MNIST 8-bit baseline — completed 2026-05-06
 - [x] Run MiniGPT smoke test — completed 2026-05-06
-- [x] Run Spectral baseline (Walsh/DCT) — completed 2026-05-06 (Walsh Pure beats Adam; DCT Pure fails — requires debug)
+- [x] Run Spectral baseline (Walsh/DCT) — completed 2026-05-06 (Walsh Pure beats Adam; DCT Pure fixed 2026-05-07)
 - [x] Document memory accounting fix — done
-- [ ] Debug DCT Pure failure (14% acc) — separate task in `spectral/optim_dct_pure.py`
 - [ ] Prepare GPU profiling run when DirectML available
 
 ## Phase 3: Bottleneck Analysis

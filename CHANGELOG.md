@@ -54,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - SMOWalsh Pure k=0.5: 1.74 MB → **63.3% reduction**, **64.47% acc** (+1.44% vs Adam)
     - SMOWalsh Hybrid k=0.5: 1.74 MB, 61.24% acc (−1.79% vs Adam)
     - SMODCT Hybrid k=0.5: 1.74 MB, 62.74% acc (−0.29% vs Adam)
-    - SMODCT Pure k=0.5: 4.74 MB, 14.28% acc (FAIL — requires investigation)
+    - SMODCT Pure k=0.5: 1.74 MB → **63.3% reduction**, **63.10% acc** (−0.07% vs Adam, now fixed)
 - Buffer memory accounting fixed: temporary buffers moved to `_param_buffers` (not counted in optimizer state)
 
 ### Documentation

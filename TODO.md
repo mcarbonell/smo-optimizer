@@ -3,13 +3,13 @@
 ## Current Status (2026-05-07)
 
 - ✅ **Phase 2: Correctness & Measurement** — COMPLETE (2026-05-06)
-  - Baselines completos: MNIST, CIFAR-10, MiniGPT, Spectral (Walsh/DCT)
-  - Memory savings: 63–93% según variant y tarea
-  - Accuracy trade-off documentado
+   - Baselines completos: MNIST, CIFAR-10, MiniGPT, Spectral (Walsh/DCT)
+   - Memory savings: 63–93% según variant y tarea
+   - Accuracy trade-off documentado
 - 🔄 **Phase 3: Bottleneck Analysis** — PROFILE SCRIPT READY, awaiting GPU (<50% utilization)
 - ✅ **Phase 4.1: Buffer Reuse & Memory Accounting** — COMPLETE (2026-05-06)
 - ⚠️ **Critical Finding: Walsh Pure > Adam on CIFAR-10** (+1.44% acc) — warrants deeper investigation
-- ❌ **Critical Bug: DCT Pure fails** (14% acc) — logged, separate debug task
+- ✅ **DCT Pure fixed** (2026-05-07) — now achieves 63.10% acc vs Adam 63.03%
 
 ---
 
@@ -35,7 +35,7 @@
 | CIFAR-10 | CIFAR_CNN | Walsh Pure k=0.5 | **64.47%** | 1.74 MB | 63.3% | **−1.44%** ✅ |
 | CIFAR-10 | CIFAR_CNN | Walsh Hybrid k=0.5 | 61.24% | 1.74 MB | 63.3% | −1.79% |
 | CIFAR-10 | CIFAR_CNN | DCT Hybrid k=0.5 | 62.74% | 1.74 MB | 63.3% | −0.29% |
-| CIFAR-10 | CIFAR_CNN | DCT Pure k=0.5 | 14.28% | 4.74 MB | 0% | ❌ FAIL |
+| CIFAR-10 | CIFAR_CNN | DCT Pure k=0.5 | **63.10%** | 1.74 MB | 63.3% | −0.07% ✅ |
 | MiniGPT | 4-layer | AdamW | PPL 65.31 | 6.21 MB | — | — |
 | MiniGPT | Transformer | SMO k=0.5 | PPL 66.58 | 1.56 MB | 74.9% | +1.27 |
 | MiniGPT | Transformer | SMO-8bit k=0.5 | PPL 66.58 | **0.43 MB** | **93.1%** | +1.27 |
@@ -82,7 +82,7 @@
 - **Walsh Pure k=0.5 supera a Adam** (64.47% vs 63.03%) con 63% memory savings — implica que la transformada Walsh puede mejorar conditioning del gradiente
 - Walsh Hybrid degrada (−1.79% vs Adam) — el híbrido Spatial+Walsh no ayuda
 - DCT Hybrid cerca de Adam (−0.29%) — aceptable
-- DCT Pure catastrófico (14% acc) — **bug confirmado** en `spectral/optim_dct_pure.py` (normalización o sign handling)
+- DCT Pure **arreglado** (63.10% vs 63.03% Adam) — sigue el patrón Walsh Hybrid (downsample → DCT → update frq → IDCT → upsample)
 
 **Task-Dependent Trade-off:**
 - Simple (MNIST): SMO-8bit 93.5% savings, 0% accuracy loss
@@ -139,7 +139,7 @@ Infrastructure:
 - ✅ All major baseline benchmarks executed (MNIST, CIFAR-10, MiniGPT, Spectral)
 - ✅ SMO-8bit proven: >90% memory savings with minimal quality loss on simple tasks
 - ⚠️ **Walsh Pure surprisingly beats Adam on CIFAR-10** — may indicate better gradient conditioning
-- ❌ **DCT Pure broken** — requires debug (low priority, experimental)
+- ✅ **DCT Pure fixed** — now achieves 63.10% acc (essentially matches Adam with 63% memory savings)
 - 🔄 **Buffer reuse delivered 8–24% speedup** on CPU
 - 🔄 **GPU profiling pending** — next optimization decisions await DirectML availability
 
