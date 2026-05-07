@@ -30,15 +30,14 @@ class SMO(Optimizer):
     Args:
         params: model.parameters()
         lr: learning rate (default: 1e-3)
+        betas: (beta1, beta2) (default: (0.9, 0.999))
+        eps: epsilon for numerical stability (default: 1e-8)
+        weight_decay: L2 penalty (default: 0)
         k_ratio: Fraction of resolution to keep (0.25 = 25% → 93.75% savings)
     """
     
     def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8,
                  weight_decay=0, k_ratio=0.25):
-        """
-        k_ratio: Fraction of the original resolution to keep (e.g. 0.25 = 25% per dimension).
-                 For 2D tensors, the RAM savings is 1 - (k_ratio^2) = 93.75%.
-        """
         if not 0.0 <= lr:
             raise ValueError(f"Invalid learning rate: {lr}")
         if not 0.0 <= eps:
@@ -53,6 +52,9 @@ class SMO(Optimizer):
         defaults = dict(lr=lr, betas=betas, eps=eps,
                         weight_decay=weight_decay, k_ratio=k_ratio)
         super(SMO, self).__init__(params, defaults)
+        # Private buffer pool: param_id -> {'g_comp', 'g_sq_comp', 'm_rec', 'v_rec'}
+        # These are NOT part of the optimizer state (not saved in state_dict).
+        self._param_buffers = {}
 
     @staticmethod
     def _compress_2d(tensor, target_shape):
@@ -84,14 +86,19 @@ class SMO(Optimizer):
                         state['is_compressed'] = True
                         new_h = max(1, int(grad.shape[0] * k_ratio))
                         new_w = max(1, int(grad.shape[1] * k_ratio))
-                        state['exp_avg'] = torch.zeros((new_h, new_w), dtype=grad.dtype, device=grad.device)
-                        state['exp_avg_sq'] = torch.zeros((new_h, new_w), dtype=grad.dtype, device=grad.device)
+                        comp_shape = (new_h, new_w)
+                        # Compressed moment states (persistent)
+                        state['exp_avg'] = torch.zeros(comp_shape, dtype=grad.dtype, device=grad.device)
+                        state['exp_avg_sq'] = torch.zeros(comp_shape, dtype=grad.dtype, device=grad.device)
                         state['orig_shape'] = grad.shape
-                        # Pre-allocate reusable buffers to avoid per-step allocations
-                        state['_buf_g_comp'] = torch.empty((new_h, new_w), dtype=grad.dtype, device=grad.device)
-                        state['_buf_g_sq_comp'] = torch.empty((new_h, new_w), dtype=grad.dtype, device=grad.device)
-                        state['_buf_m_rec'] = torch.empty(grad.shape, dtype=grad.dtype, device=grad.device)
-                        state['_buf_v_rec'] = torch.empty(grad.shape, dtype=grad.dtype, device=grad.device)
+                        # Allocate reusable buffers (not saved in state_dict)
+                        buf_id = id(p)
+                        self._param_buffers[buf_id] = {
+                            'g_comp': torch.empty(comp_shape, dtype=grad.dtype, device=grad.device),
+                            'g_sq_comp': torch.empty(comp_shape, dtype=grad.dtype, device=grad.device),
+                            'm_rec': torch.empty(grad.shape, dtype=grad.dtype, device=grad.device),
+                            'v_rec': torch.empty(grad.shape, dtype=grad.dtype, device=grad.device),
+                        }
                     else:
                         state['is_compressed'] = False
                         state['exp_avg'] = torch.zeros_like(p, memory_format=torch.preserve_format)
@@ -105,10 +112,23 @@ class SMO(Optimizer):
                     grad = grad.add(p, alpha=group['weight_decay'])
 
                 if state['is_compressed']:
+                    # Get reusable buffers
+                    buf_id = id(p)
+                    buffers = self._param_buffers.get(buf_id)
+                    if buffers is None:
+                        # Should not happen, but allocate fallback
+                        buffers = {
+                            'g_comp': torch.empty(exp_avg.shape, dtype=grad.dtype, device=grad.device),
+                            'g_sq_comp': torch.empty(exp_avg.shape, dtype=grad.dtype, device=grad.device),
+                            'm_rec': torch.empty(state['orig_shape'], dtype=grad.dtype, device=grad.device),
+                            'v_rec': torch.empty(state['orig_shape'], dtype=grad.dtype, device=grad.device),
+                        }
+                        self._param_buffers[buf_id] = buffers
+
                     # 1. Compress gradient into pre-allocated buffers
                     g_comp, g_sq_comp = compress_2d_pair_into_buffers(
                         grad, grad.square(),
-                        state['_buf_g_comp'], state['_buf_g_sq_comp'],
+                        buffers['g_comp'], buffers['g_sq_comp'],
                         target_shape=exp_avg.shape
                     )
                     
@@ -119,7 +139,7 @@ class SMO(Optimizer):
                     # 3. Upsample into pre-allocated reconstruction buffers
                     m_rec, v_rec = upsample_2d_pair_into_buffers(
                         exp_avg, exp_avg_sq,
-                        state['_buf_m_rec'], state['_buf_v_rec'],
+                        buffers['m_rec'], buffers['v_rec'],
                         state['orig_shape']
                     )
                     # In-place clamp to ensure positivity (mitigates interpolation artifacts)

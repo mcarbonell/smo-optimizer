@@ -1,0 +1,51 @@
+{
+  "date": "2026-05-07T12:05:26+00:00",
+  "git_commit": "2b06b8d2d60dee5f3382c7261533231739830134",
+  "script_name": "benchmarks/suites/training/benchmark_minillm.py",
+  "benchmark_family": "end_to_end_training",
+  "variant": "AdamW",
+  "hardware": "CPU",
+  "backend": "CPU",
+  "framework_versions": {
+    "torch": "2.10.0+cpu"
+  },
+  "dataset": "SyntheticTokens",
+  "model": "MiniGPT",
+  "seed": 1234,
+  "batch_size": 16,
+  "precision": "fp32",
+  "epochs": null,
+  "steps": 200,
+  "metrics": {
+    "final_val_loss": 4.1792,
+    "final_val_perplexity": 65.31,
+    "optimizer_state_mb": 6.21,
+    "total_time_s": 49.27
+  },
+  "raw_result": {
+    "optimizer": "Standard AdamW",
+    "parameters": 813440,
+    "iters": [
+      {
+        "iter": 100,
+        "train_loss": 4.1737,
+        "val_loss": 4.1755,
+        "val_perplexity": 65.07,
+        "time": 23.78
+      },
+      {
+        "iter": 200,
+        "train_loss": 4.1762,
+        "val_loss": 4.1792,
+        "val_perplexity": 65.31,
+        "time": 49.27
+      }
+    ],
+    "train_time": 0,
+    "seed": 1234,
+    "total_time": 49.27,
+    "optimizer_memory_mb": 6.21,
+    "final_val_loss": 4.1792,
+    "final_val_perplexity": 65.31
+  }
+}

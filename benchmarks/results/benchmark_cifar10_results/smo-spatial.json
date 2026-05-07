@@ -1,0 +1,71 @@
+{
+  "date": "2026-05-06T16:48:57+00:00",
+  "git_commit": "2b06b8d2d60dee5f3382c7261533231739830134",
+  "script_name": "benchmarks/suites/training/benchmark_cifar10.py",
+  "benchmark_family": "end_to_end_training",
+  "variant": "SMO-Spatial",
+  "hardware": "CPU",
+  "backend": "CPU",
+  "framework_versions": {
+    "torch": "2.10.0+cpu"
+  },
+  "dataset": "CIFAR-10",
+  "model": "CIFAR_CNN",
+  "seed": 1234,
+  "batch_size": 128,
+  "precision": "fp32",
+  "epochs": 5,
+  "steps": null,
+  "metrics": {
+    "final_accuracy": 64.83,
+    "optimizer_state_mb": 1.74,
+    "total_time_s": 684.52
+  },
+  "raw_result": {
+    "optimizer": "SMO (k_ratio=0.5)",
+    "parameters": 620810,
+    "epochs": [
+      {
+        "epoch": 1,
+        "train_loss": 1.6649,
+        "train_acc": 37.98,
+        "test_acc": 49.83,
+        "time": 144.77
+      },
+      {
+        "epoch": 2,
+        "train_loss": 1.3893,
+        "train_acc": 49.0,
+        "test_acc": 52.04,
+        "time": 133.73
+      },
+      {
+        "epoch": 3,
+        "train_loss": 1.2483,
+        "train_acc": 54.56,
+        "test_acc": 61.99,
+        "time": 136.17
+      },
+      {
+        "epoch": 4,
+        "train_loss": 1.1574,
+        "train_acc": 58.37,
+        "test_acc": 63.01,
+        "time": 134.57
+      },
+      {
+        "epoch": 5,
+        "train_loss": 1.0884,
+        "train_acc": 61.29,
+        "test_acc": 64.83,
+        "time": 135.28
+      }
+    ],
+    "train_time": 0,
+    "seed": 1234,
+    "total_time": 684.52,
+    "optimizer_memory_mb": 1.74,
+    "final_test_acc": 64.83
+  },
+  "k_ratio": 0.5
+}

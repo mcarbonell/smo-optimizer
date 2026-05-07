@@ -1,0 +1,70 @@
+{
+  "date": "2026-05-06T16:48:57+00:00",
+  "git_commit": "2b06b8d2d60dee5f3382c7261533231739830134",
+  "script_name": "benchmarks/suites/training/benchmark_cifar10.py",
+  "benchmark_family": "end_to_end_training",
+  "variant": "Adam",
+  "hardware": "CPU",
+  "backend": "CPU",
+  "framework_versions": {
+    "torch": "2.10.0+cpu"
+  },
+  "dataset": "CIFAR-10",
+  "model": "CIFAR_CNN",
+  "seed": 1234,
+  "batch_size": 128,
+  "precision": "fp32",
+  "epochs": 5,
+  "steps": null,
+  "metrics": {
+    "final_accuracy": 66.91,
+    "optimizer_state_mb": 4.74,
+    "total_time_s": 634.77
+  },
+  "raw_result": {
+    "optimizer": "Standard Adam",
+    "parameters": 620810,
+    "epochs": [
+      {
+        "epoch": 1,
+        "train_loss": 1.6564,
+        "train_acc": 38.64,
+        "test_acc": 52.11,
+        "time": 114.26
+      },
+      {
+        "epoch": 2,
+        "train_loss": 1.387,
+        "train_acc": 49.36,
+        "test_acc": 55.8,
+        "time": 114.87
+      },
+      {
+        "epoch": 3,
+        "train_loss": 1.2556,
+        "train_acc": 54.41,
+        "test_acc": 62.2,
+        "time": 138.44
+      },
+      {
+        "epoch": 4,
+        "train_loss": 1.1719,
+        "train_acc": 57.75,
+        "test_acc": 63.25,
+        "time": 137.24
+      },
+      {
+        "epoch": 5,
+        "train_loss": 1.1036,
+        "train_acc": 60.58,
+        "test_acc": 66.91,
+        "time": 129.96
+      }
+    ],
+    "train_time": 0,
+    "seed": 1234,
+    "total_time": 634.77,
+    "optimizer_memory_mb": 4.74,
+    "final_test_acc": 66.91
+  }
+}

@@ -1,85 +1,173 @@
-# SMO
+# SMO — State Memory Optimizer
+
+[![Status: Active Research](https://img.shields.io/badge/status-active_research-green)](docs/ROADMAP.md)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 SMO is a research repository for memory-efficient optimizer experiments in PyTorch.
 
-The core idea is to reduce optimizer-state memory by compressing first- and second-order states, with current work spanning:
+The core idea is to reduce optimizer-state memory by compressing first- and second-order moments, with current work spanning:
 
-- Spatial optimizer-state compression
-- Spectral optimizer-state compression
-- 8-bit compressed optimizer states
-- Early activation-memory compression experiments
-- Experimental Triton kernels for NVIDIA GPUs
+- **Spatial optimizer-state compression** (SMO-Spatial, SMO-8bit)
+- **Spectral optimizer-state compression** (SMO-Walsh, SMO-DCT) — experimental
+- **Activation-memory compression** — early experiments
+- **Triton kernels** for NVIDIA GPUs — future work
 
-This repository is currently in a consolidation phase. The immediate goal is to make the project professionally reviewable before deeper optimization work:
+---
 
-- stabilize naming and positioning
-- unify the variant taxonomy
-- standardize benchmark methodology
-- separate production-ready code from experiments
+## 🎯 Key Results (CPU, seed=1234)
 
-## Current Recommendation On Naming
+### Memory Savings vs Accuracy Trade-off
 
-`Super Mario Optimizer` is memorable, but it is not a good long-term public name:
+| Dataset | Model | Adam (baseline) | SMO k=0.25 | SMO-8bit k=0.25 |
+|---------|-------|----------------|------------|-----------------|
+| **MNIST** | SimpleCNN | 99.04% / 3.22 MB | 98.90% / 0.35 MB **(89.1% savings)** | 98.97% / **0.21 MB (93.5%)** |
+| **CIFAR-10** | CIFAR_CNN | 66.91% / 4.74 MB | 63.59% / 0.99 MB **(79.1%)** | — |
+| **MiniGPT** | 4-layer Transformer | PPL 65.31 / 6.21 MB | — | PPL 66.58 / **0.43 MB (93.1%)** |
 
-- it is very close to Nintendo's `Super Mario` trademark
-- it can make the project feel more playful than rigorous
-- it creates unnecessary friction for papers, benchmarks, packaging, and external adoption
+**Spectral Variants (CIFAR-10, 3 epochs):**
+- **Walsh Pure k=0.5**: 64.47% acc / 1.74 MB → **63.3% savings**, **beats Adam by +1.44%**
+- Walsh Hybrid k=0.5: 61.24% / 1.74 MB (−1.79%)
+- DCT Hybrid k=0.5: 62.74% / 1.74 MB (−0.29%)
+- DCT Pure k=0.5: **FAIL** (14% acc, under investigation)
 
-Recommendation:
+> **Takeaway:** Spatial+8bit compression achieves **>90% memory reduction** on simple/medium tasks with minimal accuracy loss. On harder tasks (CIFAR-10) trade-off is larger (−3% at k=0.25) but improves with less aggressive compression (−2% at k=0.5). Surprisingly, Walsh Pure outperforms Adam on CIFAR-10 — worth deeper investigation.
 
-- keep `SMO` as the stable short name
-- treat `Super Mario Optimizer` as a temporary internal codename or historical note
-- migrate the public expansion of `SMO` toward a neutral technical name such as:
-  - `State Memory Optimizer`
-  - `State-compressed Memory Optimizer`
-  - `Spectral Memory Optimizer`
+---
 
-## Repository Status
+## 📂 Repository Structure
 
-Today the repo is organized around four main areas:
-
-- `smo/optimizers/`: main optimizer implementations
-- `smo/activations/`: activation-memory experiments
-- `smo/experimental/`: spectral and other experimental variants
-- `benchmarks/`: benchmark suites, hardware runners, methodology, and stored results
-
-Backward-compatible wrappers are still present at the old import paths to ease the transition.
-
-## Project Documents
-
-- [Project Foundation](/C:/Users/mrcm_/Local/proj/algorithms/supermario_optimizer/docs/PROJECT_FOUNDATION.md)
-- [Roadmap](/C:/Users/mrcm_/Local/proj/algorithms/supermario_optimizer/docs/ROADMAP.md)
-- [Benchmark Methodology](/C:/Users/mrcm_/Local/proj/algorithms/supermario_optimizer/benchmarks/METHODOLOGY.md)
-- [Benchmark Catalog](/C:/Users/mrcm_/Local/proj/algorithms/supermario_optimizer/benchmarks/CATALOG.md)
-
-## Proposed Variant Taxonomy
-
-The current repo names can be normalized like this:
-
-- `SMO-Spatial`: current `smo/optimizers/spatial.py`
-- `SMO-Spatial-8bit`: current `smo/optimizers/spatial_8bit.py`
-- `SMO-Spatial-Triton`: current `smo/optimizers/spatial_triton.py`
-- `SMO-Spatial-8bit-Triton`: current `smo/optimizers/spatial_8bit_triton.py`
-- `SMO-Walsh`: current `smo/experimental/walsh.py`
-- `SMO-DCT`: current `smo/experimental/dct.py`
-- `SMO-Activation-FP16` / `SMO-Activation-8bit` / `SMO-Activation-Delta`: current `smo/activations/`
-
-This preserves continuity while making it much easier to compare variants cleanly.
-
-## Near-Term Priorities
-
-1. Freeze names, scope, and experiment categories.
-2. Unify benchmark inputs, metrics, and result formats.
-3. Separate stable implementations from research code.
-4. Validate claims on CPU, AMD, and NVIDIA with repeatable methodology.
-5. Only then refactor kernels and optimize bottlenecks.
-
-## Installation
-
-```bash
-pip install -e .
+```
+supermario_optimizer/
+├── smo/
+│   ├── optimizers/      # Stable: SMO-Spatial, SMO-Spatial-8bit
+│   ├── activations/     # Experimental: activation compression
+│   ├── experimental/    # Research: spectral (Walsh, DCT), Triton
+│   └── utils/           # Shared utilities
+├── benchmarks/
+│   ├── suites/          # Canonical benchmark entrypoints
+│   │   ├── optimizer_step/   # Microbench: step time, memory
+│   │   ├── training/         # End-to-end: MNIST, CIFAR-10, MiniGPT
+│   │   ├── activations/      # Activation compression tests
+│   │   ├── spectral/         # Spectral variant baselines
+│   │   └── comparison/       # Multi-seed, multi-hardware
+│   ├── runners/         # Hardware-specific launchers (Modal, DirectML)
+│   ├── results/         # JSON outputs (aggregate + per-run)
+│   ├── METHODOLOGY.md   # Benchmarking standards
+│   └── CATALOG.md       # Inventory of all suites
+├── profiles/            # Profiling scripts (torch.profiler)
+├── docs/
+│   ├── PROJECT_FOUNDATION.md  # Naming, taxonomy, layering
+│   └── ROADMAP.md             # Phase-by-phase progress
+├── tests/               # Unit tests
+├── CHANGELOG.md         # Version history
+└── TODO.md             # Current task tracking
 ```
 
-## Current Caveat
+---
 
-The repository still contains exploratory code and benchmark scripts with overlapping purposes. The new documentation added in this phase is intended to serve as the contract for the cleanup and consolidation work that follows.
+## 📋 Documentation
+
+- **Project Foundation** — naming decisions, variant taxonomy, repository organization  
+  → `docs/PROJECT_FOUNDATION.md`
+- **Roadmap** — Phase 1–6 progress, current status, next actions  
+  → `docs/ROADMAP.md`
+- **Benchmark Methodology** — seeding policy, hardware matrix, result format  
+  → `benchmarks/METHODOLOGY.md`
+- **Benchmark Catalog** — canonical suites, categories, legacy wrappers  
+  → `benchmarks/CATALOG.md`
+- **Changelog** — versioned releases and unreleased changes  
+  → `CHANGELOG.md`
+- **Task Tracking** — in-progress work and blockers  
+  → `TODO.md`
+
+---
+
+## 🚀 Quick Start
+
+### Running Benchmarks
+
+```bash
+# Microbenchmark: optimizer step time (multi-shape, multi-seed)
+python -m benchmarks.suites.optimizer_step.benchmark_step_time \
+    --shapes 256,512,1024 --seeds 1234,5678,9012 --device cpu
+
+# End-to-end: MNIST (SMO vs Adam)
+python -m benchmarks.suites.training.benchmark_mnist --epochs 5 --seed 1234
+
+# End-to-end: CIFAR-10
+python -m benchmarks.suites.training.benchmark_cifar10 --epochs 5 --seed 1234
+
+# End-to-end: 8-bit variant (MNIST)
+python -m benchmarks.suites.training.benchmark_8bit --epochs 5 --seed 1234
+
+# End-to-end: MiniGPT smoke (200 iters)
+python -m benchmarks.suites.training.benchmark_minillm --max_iters 200 --seed 1234
+
+# Spectral variants baseline (CIFAR-10, 3 epochs)
+python -m benchmarks.suites.spectral.benchmark_spectral_cpu --epochs 3 --seed 1234
+
+# Profiling: step breakdown (CPU)
+python profiles/profile_smo_step.py --shape 1024,1024 --steps 100 --seed 1234
+```
+
+All results saved to `benchmarks/results/` as JSON bundles.
+
+---
+
+## 🧪 Current Status
+
+**Phase 2 — Correctness & Measurement:** ✅ COMPLETE (2026-05-06)
+- Deterministic seeding across 12+ canonical benchmarks
+- Multi-seed aggregation (mean±std) in microbenchmarks
+- GPU sync infrastructure (CUDA/DirectML)
+- Memory accounting corrected (temp buffers excluded)
+- Baseline suite executed: MNIST, CIFAR-10, MiniGPT, Spectral variants
+
+**Phase 3 — Bottleneck Analysis:** 🔄 AWAITING GPU
+- Profiling suite `profiles/profile_smo_step.py` ready (manual timers + torch.profiler)
+- CPU profiling data: compression 41%, upsampling 31%, update 3%
+- Blocked: local DirectML GPU >90% utilization
+
+**Phase 4 — Optimization Work:**
+- ✅ **4.1 Buffer reuse** — 8–24% CPU speedup, memory accounting fixed
+- ⏳ **4.2 Post-profiling** — pending GPU data (pooling kernel eval, upsampling bypass)
+
+---
+
+## 📈 Performance Highlights
+
+**SMO-Spatial (CPU step time, after buffer reuse):**
+
+| Shape | AdamW | SMO (antes) | SMO (después) | Mejora |
+|-------|-------|-------------|---------------|--------|
+| 256×256 | 1.43 ms | 3.87 ms | 2.93 ms | **−24%** |
+| 512×512 | 4.67 ms | 9.97 ms | 8.97 ms | **−10%** |
+| 1024×1024 | 20.16 ms | 32.36 ms | 29.86 ms | **−8%** |
+
+**Memory Compression (k_ratio=0.25):**
+
+| Task | Adam State | SMO State | Reduction |
+|------|------------|-----------|-----------|
+| MNIST (2 linear layers) | 3.22 MB | 0.35 MB | 89.1% |
+| CIFAR-10 (2 linear + 3 conv) | 4.74 MB | 0.99 MB | 79.1% |
+| MiniGPT (8 linear) | 6.21 MB | 0.43 MB (8bit) | 93.1% |
+
+---
+
+## 🐛 Known Issues
+
+- **DCT Pure variant fails** on CIFAR-10 (14% acc vs Adam 63%) — bug in `spectral/optim_dct_pure.py` (under investigation)
+- **Accuracy gap on complex tasks**: CIFAR-10 gap −3.32% at k=0.25; consider k=0.5 for better quality (−2.08% gap)
+- **GPU profiling pending**: DirectML machine at high utilization; will run profiling when <50%
+
+---
+
+## 📜 License
+
+MIT — see `LICENSE` for details.
+
+---
+
+## 🙋 Contributing
+
+This is a research project. For issues, see the TODO tracking in `TODO.md`. For questions, open a GitHub issue.

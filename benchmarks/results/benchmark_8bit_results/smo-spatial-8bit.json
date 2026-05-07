@@ -1,0 +1,71 @@
+{
+  "date": "2026-05-07T12:01:46+00:00",
+  "git_commit": "2b06b8d2d60dee5f3382c7261533231739830134",
+  "script_name": "benchmarks/suites/training/benchmark_8bit.py",
+  "benchmark_family": "end_to_end_training",
+  "variant": "SMO-Spatial-8bit",
+  "hardware": "CPU",
+  "backend": "CPU",
+  "framework_versions": {
+    "torch": "2.10.0+cpu"
+  },
+  "dataset": "MNIST",
+  "model": "SimpleCNN",
+  "seed": 1234,
+  "batch_size": 128,
+  "precision": "fp32",
+  "epochs": 5,
+  "steps": null,
+  "metrics": {
+    "final_accuracy": 98.97,
+    "optimizer_state_mb": 0.21,
+    "total_time_s": 291.16
+  },
+  "raw_result": {
+    "optimizer": "SMO-8bit (k_ratio=0.25) [Spatial + 8-bit Quantized]",
+    "parameters": 421642,
+    "epochs": [
+      {
+        "epoch": 1,
+        "train_loss": 0.3138,
+        "train_acc": 90.87,
+        "test_acc": 96.59,
+        "time": 57.49
+      },
+      {
+        "epoch": 2,
+        "train_loss": 0.0809,
+        "train_acc": 97.53,
+        "test_acc": 97.94,
+        "time": 58.81
+      },
+      {
+        "epoch": 3,
+        "train_loss": 0.0578,
+        "train_acc": 98.28,
+        "test_acc": 98.71,
+        "time": 56.57
+      },
+      {
+        "epoch": 4,
+        "train_loss": 0.0468,
+        "train_acc": 98.53,
+        "test_acc": 98.47,
+        "time": 57.2
+      },
+      {
+        "epoch": 5,
+        "train_loss": 0.0406,
+        "train_acc": 98.81,
+        "test_acc": 98.97,
+        "time": 61.09
+      }
+    ],
+    "train_time": 0,
+    "seed": 1234,
+    "total_time": 291.16,
+    "optimizer_memory_mb": 0.21,
+    "final_test_acc": 98.97
+  },
+  "k_ratio": 0.25
+}

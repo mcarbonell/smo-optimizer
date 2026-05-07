@@ -35,7 +35,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 256×256: −24.2% (3.865 ms → 2.928 ms)
   - 512×512: −10.0% (9.968 ms → 8.965 ms)
   - 1024×1024: −7.8% (32.363 ms → 29.856 ms)
-- Memory savings baseline: **89.1% optimizer-state reduction** vs Adam on MNIST (k=0.25, accuracy −0.14%)
+- **Memory savings baselines**:
+  - MNIST (Simple CNN):
+    - Adam: 3.22 MB, 99.04% acc
+    - SMO k=0.25: 0.35 MB → **89.1% reduction**, 98.90% acc (−0.14% gap)
+    - SMO k=0.5: 0.92 MB → 71.5% reduction, 99.13% acc
+    - SMO-8bit k=0.25: **0.21 MB** → **93.5% reduction**, 98.97% acc (quality maintained)
+  - CIFAR-10 (CIFAR_CNN):
+    - Adam: 4.74 MB, 66.91% acc
+    - SMO k=0.25: 0.99 MB → **79.1% reduction**, 63.59% acc (−3.32% gap)
+    - SMO k=0.5: 1.74 MB → **63.3% reduction**, 64.83% acc (−2.08% gap)
+  - MiniGPT (Transformer, 200 iters, smoke):
+    - AdamW: 6.21 MB, PPL 65.31
+    - SMO k=0.5: 1.56 MB → **74.9% reduction**, PPL 66.58 (+1.27)
+    - SMO-8bit k=0.5: **0.43 MB** → **93.1% reduction**, PPL 66.58 (same as SMO)
+  - Spectral variants (CIFAR-10, 3 epochs):
+    - AdamW: 4.74 MB, 63.03% acc
+    - SMOWalsh Pure k=0.5: 1.74 MB → **63.3% reduction**, **64.47% acc** (+1.44% vs Adam)
+    - SMOWalsh Hybrid k=0.5: 1.74 MB, 61.24% acc (−1.79% vs Adam)
+    - SMODCT Hybrid k=0.5: 1.74 MB, 62.74% acc (−0.29% vs Adam)
+    - SMODCT Pure k=0.5: 4.74 MB, 14.28% acc (FAIL — requires investigation)
+- Buffer memory accounting fixed: temporary buffers moved to `_param_buffers` (not counted in optimizer state)
 
 ### Documentation
 - `docs/ROADMAP.md`: Phase 2 marked complete; Phase 4 buffer reuse documented; profiling suite added

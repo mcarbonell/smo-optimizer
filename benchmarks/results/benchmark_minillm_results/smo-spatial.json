@@ -1,0 +1,52 @@
+{
+  "date": "2026-05-07T12:05:26+00:00",
+  "git_commit": "2b06b8d2d60dee5f3382c7261533231739830134",
+  "script_name": "benchmarks/suites/training/benchmark_minillm.py",
+  "benchmark_family": "end_to_end_training",
+  "variant": "SMO-Spatial",
+  "hardware": "CPU",
+  "backend": "CPU",
+  "framework_versions": {
+    "torch": "2.10.0+cpu"
+  },
+  "dataset": "SyntheticTokens",
+  "model": "MiniGPT",
+  "seed": 1234,
+  "batch_size": 16,
+  "precision": "fp32",
+  "epochs": null,
+  "steps": 200,
+  "metrics": {
+    "final_val_loss": 4.1984,
+    "final_val_perplexity": 66.58,
+    "optimizer_state_mb": 1.56,
+    "total_time_s": 56.95
+  },
+  "raw_result": {
+    "optimizer": "SMO (k_ratio=0.5)",
+    "parameters": 813440,
+    "iters": [
+      {
+        "iter": 100,
+        "train_loss": 4.1927,
+        "val_loss": 4.1944,
+        "val_perplexity": 66.31,
+        "time": 28.94
+      },
+      {
+        "iter": 200,
+        "train_loss": 4.185,
+        "val_loss": 4.1984,
+        "val_perplexity": 66.58,
+        "time": 56.95
+      }
+    ],
+    "train_time": 0,
+    "seed": 1234,
+    "total_time": 56.95,
+    "optimizer_memory_mb": 1.56,
+    "final_val_loss": 4.1984,
+    "final_val_perplexity": 66.58
+  },
+  "k_ratio": 0.5
+}

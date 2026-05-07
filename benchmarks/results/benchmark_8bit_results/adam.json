@@ -1,0 +1,70 @@
+{
+  "date": "2026-05-07T12:01:46+00:00",
+  "git_commit": "2b06b8d2d60dee5f3382c7261533231739830134",
+  "script_name": "benchmarks/suites/training/benchmark_8bit.py",
+  "benchmark_family": "end_to_end_training",
+  "variant": "Adam",
+  "hardware": "CPU",
+  "backend": "CPU",
+  "framework_versions": {
+    "torch": "2.10.0+cpu"
+  },
+  "dataset": "MNIST",
+  "model": "SimpleCNN",
+  "seed": 1234,
+  "batch_size": 128,
+  "precision": "fp32",
+  "epochs": 5,
+  "steps": null,
+  "metrics": {
+    "final_accuracy": 98.96,
+    "optimizer_state_mb": 3.22,
+    "total_time_s": 280.54
+  },
+  "raw_result": {
+    "optimizer": "Standard Adam",
+    "parameters": 421642,
+    "epochs": [
+      {
+        "epoch": 1,
+        "train_loss": 0.1643,
+        "train_acc": 95.15,
+        "test_acc": 98.24,
+        "time": 59.69
+      },
+      {
+        "epoch": 2,
+        "train_loss": 0.0485,
+        "train_acc": 98.51,
+        "test_acc": 98.02,
+        "time": 60.84
+      },
+      {
+        "epoch": 3,
+        "train_loss": 0.0332,
+        "train_acc": 98.96,
+        "test_acc": 98.88,
+        "time": 51.23
+      },
+      {
+        "epoch": 4,
+        "train_loss": 0.0254,
+        "train_acc": 99.18,
+        "test_acc": 98.96,
+        "time": 54.14
+      },
+      {
+        "epoch": 5,
+        "train_loss": 0.0205,
+        "train_acc": 99.34,
+        "test_acc": 98.96,
+        "time": 54.64
+      }
+    ],
+    "train_time": 0,
+    "seed": 1234,
+    "total_time": 280.54,
+    "optimizer_memory_mb": 3.22,
+    "final_test_acc": 98.96
+  }
+}
