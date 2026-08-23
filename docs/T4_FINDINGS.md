@@ -58,6 +58,15 @@ Effect size +2.6…+2.8 with σ≈0.3 → z ≈ 5–9. **Not noise.**
    from compression (dense moments there, 164k of 25.4M params) recovers ~⅓ of the LM gap
    (+0.49 → +0.33 at k=0.25). Output-layer smoothing is *a* mechanism, not *the* mechanism;
    the rest lives in the hidden-layer linears. bnb state_MB now measures correctly (49.5 MB).
+6. **First killer-demo attempt OOM'd for ALL optimizers — and exposed a structural limit
+   (`--tag big`, 2026-08-23).** At ~906M params without activation checkpointing even bnb
+   died on activations; more importantly, the SMO8bit step materializes full-resolution
+   temporaries (stacked grad+grad² for pooling ≈ +12 B/param, bilinear reconstruction
+   ≈ +8 B/param), so its step-time peak (~21 B/param) exceeds AdamW's (~20 B/param):
+   **no model size exists where AdamW OOMs but SMO8bit survives** in monolithic mode.
+   Fix landed: `low_peak=True` row-banded compress/update (exact by locality of
+   avg-pool/bilinear; bit-identical states in tests) → step peak ≈ 9 B/param.
+   Killer demo is now viable again; rerun with `--low_peak` and AdamW-hostile sizing.
 
 ## Working hypotheses
 
@@ -72,7 +81,11 @@ Effect size +2.6…+2.8 with σ≈0.3 → z ≈ 5–9. **Not noise.**
 ## Pending experiments
 
 - [x] CharGPT `--protect_output` (`--tag prot`) — H1 partial: −0.16 nats recovered
-- [ ] Killer demo: ~700M+ CharGPT where AdamW OOMs on T4 but SMO-8bit fits (running)
+- [ ] Killer demo, attempt 2 (needs `low_peak`, landed): e.g.
+      `--d_model 1280 --layers 36 --block_size 256 --batch 8 --steps 200 --amp --low_peak`
+      (~700M params: AdamW ≈ 14 GB static + activations → OOM; SMO-8bit lp ≈ 6.5 GB)
 - [ ] ViT long-run (10 epochs × 3 seeds) — does the regularizer effect decay? (H2)
 - [ ] CharGPT k=0.5 + protect_output combined
 - [ ] CharGPT comparisons at ≥3 fresh seeds (currently single-seed)
+- [ ] Port row-banded update to SMO-Spatial (same transient bottleneck there:
+      stacked pooling input + resident full-size reconstruction buffers)

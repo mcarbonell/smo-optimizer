@@ -85,7 +85,7 @@ def resolve_device(name: str) -> torch.device:
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def make_optimizer(name: str, model: nn.Module, lr: float, k_ratio: float, protect_output: bool = False):
+def make_optimizer(name: str, model: nn.Module, lr: float, k_ratio: float, protect_output: bool = False, low_peak: bool = False):
     """Build an optimizer; for SMO variants optionally exclude embedding/head params."""
     if name == "adamw":
         return torch.optim.AdamW(model.parameters(), lr=lr, betas=(0.9, 0.999), eps=1e-8)
@@ -95,8 +95,11 @@ def make_optimizer(name: str, model: nn.Module, lr: float, k_ratio: float, prote
         return bnb.optim.AdamW8bit(model.parameters(), lr=lr, betas=(0.9, 0.999))
     if name in ("smo", "smo8bit"):
         cls = SMO if name == "smo" else SMO8bit
+        kwargs = {}
+        if name == "smo8bit" and low_peak:
+            kwargs["low_peak"] = True
         if not protect_output:
-            return cls(model.parameters(), lr=lr, k_ratio=k_ratio)
+            return cls(model.parameters(), lr=lr, k_ratio=k_ratio, **kwargs)
         protected, regular = [], []
         for pname, p in model.named_parameters():
             (protected if ("emb" in pname or "head" in pname) else regular).append(p)
@@ -106,7 +109,7 @@ def make_optimizer(name: str, model: nn.Module, lr: float, k_ratio: float, prote
         ]
         print(f"  protect_output: {sum(p.numel() for p in protected):,} protected / "
               f"{sum(p.numel() for p in regular):,} compressed params")
-        return cls(groups, lr=lr, k_ratio=k_ratio)
+        return cls(groups, lr=lr, k_ratio=k_ratio, **kwargs)
     raise ValueError(f"Unknown optimizer: {name}")
 
 
@@ -256,7 +259,9 @@ def run_gpt(args, opt_name: str, device: torch.device) -> dict:
         y = torch.stack([data[i + 1 : i + 1 + args.block_size] for i in ix]).to(device)
         return x, y
 
-    optimizer = make_optimizer(opt_name, model, args.lr, args.k_ratio, getattr(args, "protect_output", False))
+    optimizer = make_optimizer(opt_name, model, args.lr, args.k_ratio,
+                               getattr(args, "protect_output", False),
+                               getattr(args, "low_peak", False))
     scheduler = build_schedule(optimizer, warmup=100, total_steps=args.steps)
     scaler = torch.amp.GradScaler("cuda", enabled=args.amp and device.type == "cuda")
 
@@ -393,7 +398,9 @@ def run_vit(args, opt_name: str, device: torch.device) -> dict:
     model = TinyViT(32, args.patch, 10, args.width, args.depth, args.heads).to(device)
     n_params = sum(p.numel() for p in model.parameters())
 
-    optimizer = make_optimizer(opt_name, model, args.lr, args.k_ratio, getattr(args, "protect_output", False))
+    optimizer = make_optimizer(opt_name, model, args.lr, args.k_ratio,
+                               getattr(args, "protect_output", False),
+                               getattr(args, "low_peak", False))
     steps_per_epoch = len(train_loader)
     scheduler = build_schedule(optimizer, warmup=max(1, steps_per_epoch // 5), total_steps=steps_per_epoch * args.epochs)
     scaler = torch.amp.GradScaler("cuda", enabled=autocast_on)
@@ -451,6 +458,8 @@ def main():
     parser.add_argument("--k_ratio", type=float, default=0.25)
     parser.add_argument("--protect_output", action="store_true",
                         help="SMO variants: keep embedding/head params on dense Adam moments")
+    parser.add_argument("--low_peak", action="store_true",
+                        help="SMO8bit: row-banded compress/update (no full-size temporaries)")
     parser.add_argument("--tag", type=str, default="", help="Suffix for result filenames (multi-seed / ablations)")
     parser.add_argument("--amp", action="store_true", help="fp16 autocast for fwd/bwd (states stay fp32)")
     parser.add_argument("--eval_interval", type=int, default=100)
@@ -504,7 +513,11 @@ def main():
     print(f"{'=' * 72}")
 
     for name in opt_names:
-        label = {"adamw": "AdamW-fp32", "bnb8bit": "bnb-AdamW8bit", "smo": f"SMO k={args.k_ratio}", "smo8bit": f"SMO-8bit k={args.k_ratio}"}[name]
+        labels = {"adamw": "AdamW-fp32", "bnb8bit": "bnb-AdamW8bit",
+                  "smo": f"SMO k={args.k_ratio}", "smo8bit": f"SMO-8bit k={args.k_ratio}"}
+        label = labels[name]
+        if name == "smo8bit" and args.low_peak:
+            label += " lp"
         print(f"\n--- {label} ---")
         set_seed(args.seed)
         free_memory()
@@ -533,7 +546,8 @@ def main():
             epochs=args.epochs if args.suite == "vit" else None,
             steps=args.steps if args.suite == "gpt" else None,
             metrics=result,
-            extra={"workload": workload, "k_ratio": args.k_ratio, "metric_key": metric_key},
+            extra={"workload": workload, "k_ratio": args.k_ratio, "metric_key": metric_key,
+                   "low_peak": bool(args.low_peak), "protect_output": bool(args.protect_output)},
         )
         runs.append(record)
 

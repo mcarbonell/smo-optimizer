@@ -75,5 +75,44 @@ class SpatialOptimizerTests(unittest.TestCase):
         self.assertFalse(opt_smo.state[param_smo]["is_compressed"])
 
 
+class LowPeakBandedUpdateTests(unittest.TestCase):
+    def _train_pair(self, shape, k_ratio=0.25, steps=3, weight_decay=0.0):
+        torch.manual_seed(11)
+        init = torch.randn(*shape)
+
+        param_mono = torch.nn.Parameter(init.clone())
+        param_band = torch.nn.Parameter(init.clone())
+        opt_mono = SMO8bit([param_mono], lr=1e-3, k_ratio=k_ratio, block_size=64,
+                           weight_decay=weight_decay)
+        opt_band = SMO8bit([param_band], lr=1e-3, k_ratio=k_ratio, block_size=64,
+                           weight_decay=weight_decay, low_peak=True, band_mb=0.05)
+
+        torch.manual_seed(23)
+        for _ in range(steps):
+            grad = torch.randn_like(init)
+            param_mono.grad = grad.clone()
+            param_band.grad = grad.clone()
+            opt_mono.step()
+            opt_band.step()
+
+        state_mono = opt_mono.state[param_mono]
+        state_band = opt_band.state[param_band]
+        return param_mono, param_band, state_mono, state_band
+
+    def test_banded_matches_monolithic_on_exact_pool_shape(self):
+        param_mono, param_band, state_mono, state_band = self._train_pair((128, 256))
+
+        self.assertTrue(torch.allclose(param_mono, param_band, atol=1e-5))
+        for key in ("m_q", "v_q"):
+            self.assertTrue(torch.equal(state_mono[key], state_band[key]))
+        for key in ("m_s", "v_s"):
+            self.assertTrue(torch.allclose(state_mono[key], state_band[key]))
+
+    def test_banded_falls_back_on_non_divisible_shape(self):
+        # 50x30 with k=0.25 -> comp 12x7; 50 % 12 != 0 -> monolithic fallback
+        param_mono, param_band, _, _ = self._train_pair((50, 30))
+        self.assertTrue(torch.allclose(param_mono, param_band, atol=1e-6))
+
+
 if __name__ == "__main__":
     unittest.main()

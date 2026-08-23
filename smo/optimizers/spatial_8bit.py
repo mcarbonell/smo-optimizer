@@ -34,9 +34,17 @@ class SMO8bit(Optimizer):
         lr: learning rate (default: 1e-3)
         k_ratio: Spatial compression ratio (default: 0.25)
         block_size: Size of quantization blocks (default: 64)
+        low_peak: If True, compress and reconstruct in row bands so no
+            full-resolution temporary is ever materialized. Reduces peak
+            step memory from ~21 to ~9 bytes/param, which is what makes
+            "trains where AdamW OOMs" possible. Requires the compressed
+            shape to evenly divide the original (exact-pool path); other
+            tensors silently fall back to the monolithic step.
+        band_mb: Approximate per-band temporary budget in MB for low_peak.
     """
     def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8,
-                 weight_decay=0, k_ratio=0.25, block_size=64):
+                 weight_decay=0, k_ratio=0.25, block_size=64,
+                 low_peak=False, band_mb=64.0):
         if not 0.0 <= lr:
             raise ValueError(f"Invalid learning rate: {lr}")
         if not 0.0 <= eps:
@@ -53,6 +61,8 @@ class SMO8bit(Optimizer):
         defaults = dict(lr=lr, betas=betas, eps=eps,
                         weight_decay=weight_decay, k_ratio=k_ratio, block_size=block_size)
         super(SMO8bit, self).__init__(params, defaults)
+        self.low_peak = low_peak
+        self.band_mb = float(band_mb)
 
     @staticmethod
     def _compress_2d(tensor, target_shape):
@@ -136,6 +146,10 @@ class SMO8bit(Optimizer):
                 beta1, beta2 = group['betas']
                 state['step'] += 1
 
+                if state['is_compressed'] and self.low_peak and self._can_band(state):
+                    self._step_banded(p, grad, state, group, beta1, beta2)
+                    continue
+
                 if group['weight_decay'] != 0:
                     grad = grad.add(p, alpha=group['weight_decay'])
 
@@ -144,23 +158,23 @@ class SMO8bit(Optimizer):
                     # so the final in-place update on p is dtype-consistent)
                     m = self._dequantize_blockwise(state['m_q'], state['m_s'], state['comp_shape'], state['comp_numel'], dtype=grad.dtype)
                     v = self._dequantize_blockwise(state['v_q'], state['v_s'], state['comp_shape'], state['comp_numel'], dtype=grad.dtype)
-                    
+
                     # 2. Compress gradient
                     g_comp, g_sq_comp = compress_2d_pair(grad, grad.square(), state['comp_shape'])
-                    
+
                     # 3. Update moments (in float32)
                     m.mul_(beta1).add_(g_comp, alpha=1 - beta1)
-                    
+
                     v.mul_(beta2).add_(g_sq_comp, alpha=1 - beta2)
-                    
+
                     # 4. Upsample for weight update BEFORE re-quantizing
                     m_rec, v_rec = upsample_2d_pair(m, v, state['orig_shape'])
                     v_rec = torch.clamp(v_rec, min=0.0)
-                    
+
                     # 5. Re-quantize and store
                     state['m_q'], state['m_s'], _ = self._quantize_blockwise(m, block_size)
                     state['v_q'], state['v_s'], _ = self._quantize_blockwise(v, block_size)
-                    
+
                     # 6. Free temporary float32 tensors immediately to avoid VRAM spikes
                     del m, v
                 else:
@@ -178,3 +192,73 @@ class SMO8bit(Optimizer):
                 p.addcdiv_(m_rec, denom, value=-step_size)
 
         return loss
+
+    def _can_band(self, state) -> bool:
+        """Banding requires the exact-pool path (orig divisible by comp)."""
+        orig_h, orig_w = state['orig_shape']
+        comp_h, comp_w = state['comp_shape']
+        return orig_h % comp_h == 0 and orig_w % comp_w == 0
+
+    def _step_banded(self, p, grad, state, group, beta1, beta2):
+        """Compress, update and reconstruct in row bands (low_peak mode).
+
+        Exact avg-pooling and bilinear interpolation are local along each
+        axis, so a row band processed with its neighboring source rows is
+        numerically identical to the monolithic computation, while keeping
+        every temporary bounded (~self.band_mb). No full-resolution tensor
+        is ever allocated: peak step memory drops from ~21 to ~9 bytes/param.
+        """
+        eps = group['eps']
+        block_size = group['block_size']
+        wd = group['weight_decay']
+        orig_h, orig_w = state['orig_shape']
+        comp_h, comp_w = state['comp_shape']
+        kh = orig_h // comp_h
+        kw = orig_w // comp_w
+        elem = grad.element_size()
+
+        # Compact (comp-resolution) floats: small by construction
+        m = self._dequantize_blockwise(state['m_q'], state['m_s'], state['comp_shape'], state['comp_numel'], dtype=grad.dtype)
+        v = self._dequantize_blockwise(state['v_q'], state['v_s'], state['comp_shape'], state['comp_numel'], dtype=grad.dtype)
+
+        # 1. Compress gradient + EMA update, band by source rows
+        band_src = max(kh, int(self.band_mb * 1024**2 / (3 * orig_w * elem)))
+        r0 = 0
+        while r0 < orig_h:
+            r1 = min(orig_h, r0 + band_src)
+            r1 -= r1 % kh
+            if r1 <= r0:
+                break
+            g_band = grad[r0:r1]
+            if wd != 0:
+                g_band = g_band.add(p[r0:r1], alpha=wd)
+            sq_band = torch.square(g_band)
+            stacked = torch.stack((g_band, sq_band), dim=0).unsqueeze(0)
+            pooled = F.avg_pool2d(stacked, kernel_size=(kh, kw), stride=(kh, kw)).squeeze(0)
+            c0, c1 = r0 // kh, r1 // kh
+            m[c0:c1].mul_(beta1).add_(pooled[0], alpha=1 - beta1)
+            v[c0:c1].mul_(beta2).add_(pooled[1], alpha=1 - beta2)
+            r0 = r1
+
+        # 2. Reconstruct + apply update, band by compressed rows (+/- 1 margin)
+        bias_correction1 = 1 - beta1 ** state['step']
+        bias_correction2 = 1 - beta2 ** state['step']
+        step_size = group['lr'] / bias_correction1
+        sqrt_bc2 = math.sqrt(bias_correction2)
+
+        band_comp = max(2, int(self.band_mb * 1024**2 / (2 * orig_w * elem * kh)))
+        for s0 in range(0, comp_h, band_comp):
+            s1 = min(comp_h, s0 + band_comp)
+            a, b = max(0, s0 - 1), min(comp_h, s1 + 1)
+            stacked = torch.stack((m[a:b], v[a:b]), dim=0).unsqueeze(0)
+            up = F.interpolate(stacked, size=((b - a) * kh, orig_w), mode='bilinear', align_corners=False).squeeze(0)
+            o0 = (s0 - a) * kh
+            o1 = o0 + (s1 - s0) * kh
+            m_band = up[0, o0:o1]
+            v_band = up[1, o0:o1].clamp_(min=0.0)
+            denom = (v_band.sqrt() / sqrt_bc2).add_(eps)
+            p[s0 * kh:s1 * kh].addcdiv_(m_band, denom, value=-step_size)
+
+        # 3. Re-quantize compact states
+        state['m_q'], state['m_s'], _ = self._quantize_blockwise(m, block_size)
+        state['v_q'], state['v_s'], _ = self._quantize_blockwise(v, block_size)
