@@ -1,12 +1,17 @@
 """
-smo/optim_8bit.py — SMO-8bit (Star Mode)
+smo/optimizers/spatial_8bit.py — SMO-8bit (Star Mode)
 
 The ultimate evolution of the SuperMario Optimizer.
 Combines:
 1. Spatial Compression (SMO): Reduces resolution of states by k_ratio.
 2. Block-wise Quantization: Stores the remaining coefficients as 8-bit integers.
 
-Memory footprint: ~2% of standard AdamW.
+Persistent optimizer-state footprint: ~2% of standard AdamW (see
+smo/optimizers/spatial.py for the persistent-vs-resident memory distinction).
+
+Only 2D gradients with both dims >= 32 are compressed; other tensors
+(e.g. 4D conv weights, 1D biases) fall back to dense Adam moments.
+
 🎮 "It's-a me, ultra-optimizer!" - Star Mode Active
 """
 
@@ -68,9 +73,16 @@ class SMO8bit(Optimizer):
         q_blocks = (blocks / scales * 127).round().to(torch.int8)
         return q_blocks, scales, orig_shape
 
-    def _dequantize_blockwise(self, q_blocks, scales, orig_shape, numel=None):
-        """Dequantizes an 8-bit block-wise tensor."""
-        blocks = q_blocks.to(torch.float32) * (scales / 127.0)
+    def _dequantize_blockwise(self, q_blocks, scales, orig_shape, numel=None, dtype=None):
+        """Dequantizes an 8-bit block-wise tensor.
+
+        Args:
+            dtype: Target dtype for the output. Defaults to float32; pass
+                ``grad.dtype`` so half-precision parameters receive moments
+                in a matching dtype (in-place ops require matching dtypes).
+        """
+        target_dtype = dtype if dtype is not None else torch.float32
+        blocks = q_blocks.to(target_dtype) * (scales.to(target_dtype) / 127.0)
         flat_data = blocks.flatten()
         if numel is None:
             numel = math.prod(orig_shape)
@@ -126,9 +138,10 @@ class SMO8bit(Optimizer):
                     grad = grad.add(p, alpha=group['weight_decay'])
 
                 if state['is_compressed']:
-                    # 1. Dequantize current state for update
-                    m = self._dequantize_blockwise(state['m_q'], state['m_s'], state['comp_shape'], state['comp_numel'])
-                    v = self._dequantize_blockwise(state['v_q'], state['v_s'], state['comp_shape'], state['comp_numel'])
+                    # 1. Dequantize current state for update (match grad dtype
+                    # so the final in-place update on p is dtype-consistent)
+                    m = self._dequantize_blockwise(state['m_q'], state['m_s'], state['comp_shape'], state['comp_numel'], dtype=grad.dtype)
+                    v = self._dequantize_blockwise(state['v_q'], state['v_s'], state['comp_shape'], state['comp_numel'], dtype=grad.dtype)
                     
                     # 2. Compress gradient
                     g_comp, g_sq_comp = compress_2d_pair(grad, grad.square(), state['comp_shape'])

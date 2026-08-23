@@ -1,5 +1,5 @@
 """
-smo/optim_walsh_pure.py — SMOWalshPure: Pure Spectral Optimizer
+smo/experimental/walsh_pure.py — SMOWalshPure: Pure Spectral Optimizer
 
 Instead of Spatial Pooling, this uses a Pure Spectral Compression approach:
 1. Pad gradient to nearest power of 2.

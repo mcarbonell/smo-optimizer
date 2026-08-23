@@ -1,5 +1,5 @@
 """
-smo/optim_8bit_triton.py — SMO8bitTriton (Hybrid GPU Architecture)
+smo/optimizers/spatial_8bit_triton.py — SMO8bitTriton (Hybrid GPU Architecture)
 
 Combines the best of both worlds:
 1. PyTorch CuDNN for perfect 2D Spatial Pooling (Overlapping Bins).

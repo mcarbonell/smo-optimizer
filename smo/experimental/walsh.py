@@ -1,5 +1,5 @@
 """
-smo/optim_walsh.py — SMOWalsh: Super Mario Optimizer (Spectral/Square version)
+smo/experimental/walsh.py — SMOWalsh: Super Mario Optimizer (Spectral/Square version)
 
 This variant uses Walsh-Hadamard transform for spectral compression.
 The idea is to compress in the frequency domain, keeping only low-frequency 

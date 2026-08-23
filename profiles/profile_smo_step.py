@@ -31,6 +31,7 @@ add_project_root_to_path()
 
 from smo import SMO
 from smo.optimizers._spatial_utils import compress_2d_pair, upsample_2d_pair
+from benchmarks.timing import get_sync_fn
 
 
 def set_seed(seed: int):
@@ -50,7 +51,14 @@ class DummyParam(nn.Module):
 
 
 def profile_step_cpu(optimizer, param, steps=100, warmup=10):
-    """Profile individual components on CPU with detailed timing."""
+    """Profile individual components with detailed per-phase timing.
+
+    Works on any device: on accelerators (CUDA/DirectML) each phase is
+    synchronized before reading the clock so timings are not distorted by
+    asynchronous execution. On CPU this is a no-op.
+    """
+    sync_fn = get_sync_fn(param.device)
+
     # Warmup
     for _ in range(warmup):
         param.grad = torch.randn_like(param)
@@ -76,18 +84,26 @@ def profile_step_cpu(optimizer, param, steps=100, warmup=10):
         beta1, beta2 = optimizer.param_groups[0]['betas']
 
         # 1. Compress
+        if sync_fn is not None:
+            sync_fn()
         t0 = time.perf_counter()
         g_comp, g_sq_comp = compress_2d_pair(grad, grad.square(), exp_avg.shape)
+        if sync_fn is not None:
+            sync_fn()
         t1 = time.perf_counter()
 
         # 2. Update compressed
         exp_avg.mul_(beta1).add_(g_comp, alpha=1 - beta1)
         exp_avg_sq.mul_(beta2).add_(g_sq_comp, alpha=1 - beta2)
+        if sync_fn is not None:
+            sync_fn()
         t2 = time.perf_counter()
 
         # 3. Upsample
         m_rec, v_rec = upsample_2d_pair(exp_avg, exp_avg_sq, state['orig_shape'])
         v_rec.clamp_(min=0.0)
+        if sync_fn is not None:
+            sync_fn()
         t3 = time.perf_counter()
 
         # 4. Weight update (p.addcdiv_)
@@ -96,6 +112,8 @@ def profile_step_cpu(optimizer, param, steps=100, warmup=10):
         step_size = optimizer.param_groups[0]['lr'] / bias_correction1
         denom = (v_rec.sqrt() / math.sqrt(bias_correction2)).add_(optimizer.param_groups[0]['eps'])
         param.data.addcdiv_(m_rec, denom, value=-step_size)
+        if sync_fn is not None:
+            sync_fn()
         t4 = time.perf_counter()
 
         # Record
@@ -187,7 +205,6 @@ def main():
     if args.use_torch_profiler:
         profile_with_torch_profiler(optimizer, param, steps=args.steps, warmup=args.warmup, device=args.device, output_dir=Path(args.output_dir))
     else:
-        import math  # needed for sqrt in manual step
         profile_step_cpu(optimizer, param, steps=args.steps, warmup=args.warmup)
 
 

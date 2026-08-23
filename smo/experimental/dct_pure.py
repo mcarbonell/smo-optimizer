@@ -1,5 +1,5 @@
 """
-smo/optim_dct_pure.py — SMODCTPure: Pure Spectral Optimizer (DCT)
+smo/experimental/dct_pure.py — SMODCTPure: Pure Spectral Optimizer (DCT)
 
 Design: Walsh Hybrid pattern with DCT:
 1. Downsample gradient to compressed size (adaptive_avg_pool2d)

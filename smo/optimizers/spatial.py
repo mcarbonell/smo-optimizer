@@ -1,12 +1,24 @@
 """
-smo/optim.py — Super Mario Optimizer (SMO)
+smo/optimizers/spatial.py — Super Mario Optimizer (SMO)
 
-This optimizer drastically reduces the RAM consumption (up to 93%) by compressing 
-the historical gradient states (Momentum 'm' and Variance 'v') using bilinear 
+This optimizer drastically reduces the persistent optimizer-state memory
+(up to 93% of the state_dict/checkpoint footprint) by compressing the
+historical gradient states (Momentum 'm' and Variance 'v') using bilinear
 interpolation (a spatial proxy for low-frequency spectral compression).
 
-The "loss of resolution" acts as a denoiser (implicit regularizer), 
+The "loss of resolution" acts as a denoiser (implicit regularizer),
 filtering out high-frequency stochastic noise from mini-batches.
+
+MEMORY ACCOUNTING NOTE:
+The reported savings refer to the *persistent* optimizer state
+(state_dict / checkpoint size). During training, this optimizer keeps a
+private buffer pool (`_param_buffers`) that includes full-resolution
+reconstruction buffers (`m_rec`, `v_rec`) cached for speed, so the resident
+working set is larger than the persistent state. See
+benchmarks/METHODOLOGY.md ("State-memory benchmarks") for definitions.
+
+Only 2D gradients with both dims >= 32 are compressed; other tensors
+(e.g. 4D conv weights, 1D biases) fall back to dense Adam moments.
 
 🎮 "It's-a me, optimizer!"
 """
@@ -125,9 +137,14 @@ class SMO(Optimizer):
                         }
                         self._param_buffers[buf_id] = buffers
 
-                    # 1. Compress gradient into pre-allocated buffers
+                    # 1. Compress gradient into pre-allocated buffers.
+                    # v_rec is reused as scratch space for grad^2 (it is
+                    # overwritten by the upsample step below), avoiding a
+                    # full-size temporary allocation every step.
+                    g_sq_scratch = buffers['v_rec']
+                    torch.square(grad, out=g_sq_scratch)
                     g_comp, g_sq_comp = compress_2d_pair_into_buffers(
-                        grad, grad.square(),
+                        grad, g_sq_scratch,
                         buffers['g_comp'], buffers['g_sq_comp'],
                         target_shape=exp_avg.shape
                     )

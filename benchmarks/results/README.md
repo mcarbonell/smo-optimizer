@@ -19,3 +19,12 @@ Those files are archived for reference only. They are not the authoritative base
 ## Working Rule
 
 Before a new benchmark campaign, clear or rotate only the active outputs that you intend to replace. Keep historical archives immutable once moved.
+
+## Provenance Notes
+
+- `benchmark_results/` (MNIST, Adam + SMO-Spatial): recorded 2026-05-05, **before** the
+  seeding standardization. Their `"seed"` field is `null` (RNGs were seeded in-code but
+  not recorded). The script now records the seed; re-run with `--seed 1234` to refresh.
+  CIFAR-10 (`benchmark_cifar10_results/`), 8-bit (`benchmark_8bit_results/`),
+  MiniGPT (`benchmark_minillm_results/`) are seed=1234 runs from 2026-05-06/07.
+

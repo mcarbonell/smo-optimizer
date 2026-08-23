@@ -1,5 +1,5 @@
 """
-smo/optim_triton.py — SMOTriton (Experimental Fused Kernel)
+smo/optimizers/spatial_triton.py — SMOTriton (Experimental Fused Kernel)
 
 This module contains custom Triton kernels to fuse the operations of the
 Super Mario Optimizer (Spatial version).

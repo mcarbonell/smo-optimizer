@@ -6,7 +6,8 @@ setup(
     description="Super Mario Optimizer (SMO) - An ultra-memory-efficient PyTorch optimizer using spatial and spectral compression.",
     author="Mario",
     url="https://github.com/mcarbonell/supermario-optimizer",
-    packages=find_packages(),
+    license="MIT",
+    packages=find_packages(include=["smo", "smo.*"]),
     install_requires=[
         "torch>=2.0.0",
     ],

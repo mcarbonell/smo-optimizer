@@ -121,16 +121,18 @@ Infrastructure:
 1. **Phase 3 GPU profiling** (BLOCKED → DirectML >90%)
    - Execute `profiles/profile_smo_step.py` en shapes 1024–4096, k=0.25/0.5
    - Export traces; decide pooling/upsampling optimizations
+   - NOTE (2026-08-23): manual timers now synchronize per phase on CUDA; DirectML still has no sync (timings there remain wall-clock approximations)
 
 2. **Phase 4.2 implementation** (post-profiling)
 
-3. **DCT Pure bug investigation** (optional while waiting):
-   - Check `spectral/optim_dct_pure.py` for normalization errors
-   - Compare vs `optim_dct.py` (Hybrid) which works
-   - Not blocking Phase 2 (DCT is experimental)
+3. ~~**DCT Pure bug investigation**~~ — RESOLVED (2026-05-07): normalization fix landed in `smo/experimental/dct_pure.py` (orthonormal DCT matrix); `spectral/optim_dct_pure.py` is only a backward-compat shim
 
-4. **Documentation polish** (if time):
-   - Add "Reproducibility" section to README (link METHODOLOGY.md)
+4. **Re-run MNIST baselines under seeding policy**:
+   - Current headline numbers (`benchmarks/results/benchmark_results/*.json`) come from 2026-05-05 runs recorded **before** the seeding standardization (`"seed": null`)
+   - Execute `python -m benchmarks.suites.training.benchmark_mnist --epochs 5 --seed 1234` and refresh README table
+   - Extend to ≥3 seeds per METHODOLOGY Rule 2 before public claims
+
+5. **Documentation polish** (if time):
    - Document spectral findings in separate `docs/SPECTRAL_FINDINGS.md` (optional)
 
 ---

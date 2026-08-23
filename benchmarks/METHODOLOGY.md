@@ -30,6 +30,18 @@ Do not mix with:
 - dataloader memory
 - CUDA allocator fragmentation
 
+**Persistent vs resident memory (definitions):**
+
+- **Persistent state** = tensors reachable through `optimizer.state_dict()`, i.e. what a
+  checkpoint stores. This is the headline "optimizer state MB" metric. SMO's compressed
+  `exp_avg`/`exp_avg_sq` live here.
+- **Resident working set** = persistent state + long-lived workspace buffers held by the
+  optimizer between steps. SMO variants cache full-resolution reconstruction buffers
+  (`_param_buffers['m_rec'/'v_rec']`) for speed, so during training the resident footprint
+  can approach Adam's even though the checkpoint is ~90% smaller.
+- Any public claim must state which of the two it refers to. Reports that only claim the
+  first must say "checkpoint/persistent state", never plain "RAM".
+
 ### B. Activation-memory benchmarks
 
 Question:

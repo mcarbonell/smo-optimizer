@@ -1,5 +1,5 @@
 """
-smo/optim_dct.py — SMODCT: Super Mario Optimizer (Discrete Cosine Transform)
+smo/experimental/dct.py — SMODCT: Super Mario Optimizer (Discrete Cosine Transform)
 
 This experimental variant uses the 2D Discrete Cosine Transform (DCT-II) 
 for spectral compression. 

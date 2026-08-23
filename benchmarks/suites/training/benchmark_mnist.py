@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 import time
+import argparse
 # Benchmark classification: family=end_to_end_training, category=end_to_end, status=canonical
 from smo import SMO
 from benchmarks._paths import DATA_DIR
@@ -173,14 +174,22 @@ def run_experiment(optimizer_name, optimizer_fn, epochs=5, device='cpu', seed=12
 
 
 def main():
-    device = 'cpu'
-    epochs = 5
+    parser = argparse.ArgumentParser(description="MNIST end-to-end training: SMO vs Adam")
+    parser.add_argument('--epochs', type=int, default=5, help='Training epochs per variant')
+    parser.add_argument('--seed', type=int, default=1234, help='Random seed for reproducibility')
+    parser.add_argument('--device', type=str, default='cpu', help='Torch device (cpu, cuda, ...)')
+    args = parser.parse_args()
+
+    device = args.device
+    epochs = args.epochs
+    seed = args.seed
     
     print("="*60)
     print("SWO Benchmark: SMO vs Standard Adam on MNIST")
     print("="*60)
     print(f"Device: {device}")
     print(f"Epochs: {epochs}")
+    print(f"Seed: {seed}")
     
     # Run Adam
     results_adam = run_experiment(
@@ -188,7 +197,7 @@ def main():
         lambda params: torch.optim.Adam(params, lr=1e-3),
         epochs=epochs,
         device=device,
-        seed=1234
+        seed=seed
     )
     
     # Run SMO (k_ratio=0.25)
@@ -197,7 +206,7 @@ def main():
         lambda params: SMO(params, lr=1e-3, k_ratio=0.25),
         epochs=epochs,
         device=device,
-        seed=1234
+        seed=seed
     )
     
     # Run SMO (k_ratio=0.5) - middle ground
@@ -206,7 +215,7 @@ def main():
         lambda params: SMO(params, lr=1e-3, k_ratio=0.5),
         epochs=epochs,
         device=device,
-        seed=1234
+        seed=seed
     )
     
     # Summary
@@ -264,9 +273,10 @@ def main():
             variant="Adam",
             script_name="benchmarks/suites/training/benchmark_mnist.py",
             hardware=device.upper(),
-            backend="CPU",
+            backend=device.upper(),
             dataset="MNIST",
             model="SimpleCNN",
+            seed=seed,
             batch_size=128,
             precision="fp32",
             epochs=epochs,
@@ -282,9 +292,10 @@ def main():
             variant="SMO-Spatial",
             script_name="benchmarks/suites/training/benchmark_mnist.py",
             hardware=device.upper(),
-            backend="CPU",
+            backend=device.upper(),
             dataset="MNIST",
             model="SimpleCNN",
+            seed=seed,
             batch_size=128,
             precision="fp32",
             epochs=epochs,
@@ -300,9 +311,10 @@ def main():
             variant="SMO-Spatial",
             script_name="benchmarks/suites/training/benchmark_mnist.py",
             hardware=device.upper(),
-            backend="CPU",
+            backend=device.upper(),
             dataset="MNIST",
             model="SimpleCNN",
+            seed=seed,
             batch_size=128,
             precision="fp32",
             epochs=epochs,

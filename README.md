@@ -32,12 +32,16 @@ The core idea is to reduce optimizer-state memory by compressing first- and seco
 
 > **Takeaway:** Spatial+8bit compression achieves **>90% memory reduction** on simple/medium tasks with minimal accuracy loss. On harder tasks (CIFAR-10) trade-off is larger (−3% at k=0.25) but improves with less aggressive compression (−2% at k=0.5). Surprisingly, Walsh Pure outperforms Adam on CIFAR-10 — worth deeper investigation.
 
+> **⚠️ Memory claims — read the fine print:** savings are measured on the **persistent optimizer state** (what `state_dict()`/a checkpoint stores). During training, SMO keeps full-resolution reconstruction buffers cached for speed, so the **resident working set is larger** than the persistent state. Definitions in `benchmarks/METHODOLOGY.md`.
+
+> **Coverage note:** only 2D parameters with both dims ≥ 32 are compressed. 4D conv weights and 1D biases fall back to dense Adam moments — this is why CIFAR-10 (conv-heavy) saves less than MNIST/MiniGPT (linear-heavy).
+
 ---
 
 ## 📂 Repository Structure
 
 ```
-supermario_optimizer/
+smo_optimizer/
 ├── smo/
 │   ├── optimizers/      # Stable: SMO-Spatial, SMO-Spatial-8bit
 │   ├── activations/     # Experimental: activation compression
@@ -157,7 +161,9 @@ All results saved to `benchmarks/results/` as JSON bundles.
 ## 🐛 Known Issues
 
 - **Accuracy gap on complex tasks**: CIFAR-10 gap −3.32% at k=0.25; consider k=0.5 for better quality (−2.08% gap)
-- **GPU profiling pending**: DirectML machine at high utilization; will run profiling when <50%
+- **GPU profiling pending**: DirectML machine at high utilization; will run profiling when <50%. Note: manual timers now synchronize on CUDA; DirectML has no sync API, so timings there remain wall-clock approximations
+- **MNIST headline numbers pre-date the seeding policy**: the tracked `benchmark_results/` JSONs were recorded 2026-05-05 with `"seed": null` (the script seeds RNGs but did not record it). CIFAR-10, MiniGPT, 8-bit and spectral results are seed=1234. Re-run pending (see TODO.md)
+- **Conv layers not compressed**: see coverage note above
 
 ---
 
