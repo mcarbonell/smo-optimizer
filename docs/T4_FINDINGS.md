@@ -220,7 +220,7 @@ Caveat: single seed; add 2 more for rigor (8 min each).
       out mistuned-SGD)
 - [ ] LR fairness sweep (~2.5 h): `t4_lr_sweep` ready — kills the mistuned-baseline
       objection and settles tuned-SGD vs H5
-- [ ] H4: `--permute_basis` ablation (~8 min) — locality vs dynamics discriminator
+- [ ] H4: add 2 extra seeds to the permute ablation (8 min each)
 - [ ] CharGPT k=0.5 + protect_output combined
 - [ ] CharGPT comparisons at ≥3 fresh seeds (currently single-seed)
 - [ ] Port row-banded update to SMO-Spatial (same transient bottleneck there:
