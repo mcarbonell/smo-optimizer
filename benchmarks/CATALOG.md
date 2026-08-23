@@ -43,6 +43,7 @@ This file is the canonical inventory for benchmark entrypoints in the repository
 | `benchmarks/runners/modal/benchmark_spectral_gpu_modal.py` | `runner` | canonical | Modal runner for spectral CIFAR-10 benchmarks |
 | `benchmarks/runners/modal/benchmark_8bit_triton_cifar10_modal.py` | `runner` | canonical | Modal runner for CIFAR-10 8-bit Triton comparison |
 | `benchmarks/runners/directml/test_gpu_directml.py` | `runner` | canonical | Local DirectML environment smoke test |
+| `benchmarks/runners/colab/t4_benchmark_colab.ipynb` | `runner` | canonical | Colab/Kaggle T4 notebook: setup, quality runs (gpt/vit), killer-demo probe, results table |
 
 ## Legacy Compatibility Entry Points
 
