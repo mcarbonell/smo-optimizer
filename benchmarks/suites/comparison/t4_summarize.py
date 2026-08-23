@@ -37,7 +37,7 @@ def main():
         print(f"No bundles matching t4_*_memory_results*.json in {RESULTS_DIR}")
         return
 
-    # (suite, variant) -> {seed: run}; later bundles win on duplicate seeds
+    # (suite, variant@horizon) -> {seed: run}; later bundles win on duplicate seeds
     groups: dict[tuple, dict] = defaultdict(dict)
     for path in files:
         bundle = json.loads(path.read_text(encoding="utf-8"))
@@ -46,7 +46,10 @@ def main():
             metrics = run["metrics"]
             if metrics.get("status") != "ok":
                 continue
-            groups[(suite, run["variant"])][run.get("seed")] = {
+            horizon = f"{run['epochs']}ep" if run.get("epochs") else (
+                f"{run['steps']}st" if run.get("steps") else "?")
+            label = f"{run['variant']}@{horizon}"
+            groups[(suite, label)][run.get("seed")] = {
                 "seed": run.get("seed"),
                 "metric": metrics.get(run.get("metric_key", "")),
                 "state_mb": metrics.get("persistent_state_mb"),
@@ -56,7 +59,7 @@ def main():
 
     lines = []
     header = (
-        f"{'suite':<6} {'optimizer':<18} {'n':>2} {'seeds':<16} "
+        f"{'suite':<6} {'optimizer':<26} {'n':>2} {'seeds':<16} "
         f"{'metric (mean±std)':>20} {'state_MB':>12} {'peak_MB':>12} {'thr/s':>12}"
     )
     lines.append(header)
@@ -73,7 +76,7 @@ def main():
 
         seeds = ",".join(str(r["seed"]) for r in runs)
         lines.append(
-            f"{suite:<6} {variant:<18} {len(runs):>2} {seeds:<16} "
+            f"{suite:<6} {variant:<26} {len(runs):>2} {seeds:<16} "
             f"{agg('metric'):>20} {agg('state_mb'):>12} {agg('peak_mb'):>12} "
             f"{agg('throughput', 0):>12}"
         )

@@ -97,7 +97,7 @@ def launch(args, lrs, seeds, opts):
 
 def analyze(args):
     mkey = METRIC_KEY[args.suite]
-    groups = defaultdict(list)  # (family, lr) -> list of metric values
+    groups = defaultdict(list)  # (family, lr, horizon) -> list of metric values
     for path in RESULTS_DIR.glob(f"t4_{args.suite}_memory_results*.json"):
         bundle = json.loads(path.read_text(encoding="utf-8"))
         for run in bundle.get("runs", []):
@@ -106,39 +106,61 @@ def analyze(args):
             if metrics.get("status") != "ok" or lr is None:
                 continue
             value = metrics.get(mkey)
-            if isinstance(value, (int, float)):
-                groups[(family_of(run["variant"]), float(lr))].append(value)
+            if not isinstance(value, (int, float)):
+                continue
+            # Horizon matters: LRs selected at N epochs do not transfer to M
+            if run.get("epochs"):
+                horizon = f"{run['epochs']}ep"
+            elif run.get("steps"):
+                horizon = f"{run['steps']}st"
+            else:
+                horizon = "?"
+            groups[(family_of(run["variant"]), float(lr), horizon)].append(value)
 
     if not groups:
         print("No bundles with recorded lr found — nothing to analyze yet.")
         return
 
     higher_better = args.suite == "vit"
+
+    mixed = {fam for fam, _, h in groups for _ in [0]}.intersection(
+        {fam for fam, _, _ in groups if len({h for f, _, h in groups if f == fam}) > 1}
+    )
+    if mixed:
+        print(f"WARNING: these families mix training horizons — compare rows "
+              f"with equal @horizon only: {sorted(mixed)}\n")
+
     lines = [f"LR sweep | suite={args.suite} | metric={mkey} "
              f"({'higher better' if higher_better else 'lower better'})", ""]
 
     best_per_family = {}
-    for family in sorted({fam for fam, _ in groups}):
-        rows = sorted((lr, vals) for (fam, lr), vals in groups.items() if fam == family)
-        means = {lr: statistics.mean(vals) for lr, vals in rows}
+    for family in sorted({fam for fam, _, _ in groups}):
+        rows = sorted(
+            ((lr, horizon, vals) for (fam, lr, horizon), vals in groups.items() if fam == family),
+            key=lambda r: (r[0], r[1]),
+        )
+        means = {(lr, horizon): statistics.mean(vals) for lr, horizon, vals in rows}
         best_mean = max(means.values()) if higher_better else min(means.values())
         lines.append(f"--- {family} ---")
-        for lr, vals in rows:
-            cell = f"{means[lr]:.2f}"
+        for lr, horizon, vals in rows:
+            cell = f"{means[(lr, horizon)]:.2f}"
             if len(vals) > 1:
                 cell += f"±{statistics.stdev(vals):.2f}"
-            marker = "  <-- best" if means[lr] == best_mean else ""
-            lines.append(f"  lr={lr:<9g} n={len(vals)}  {cell}{marker}")
-        best_per_family[family] = (best_mean, min(lr for lr, m in means.items() if m == best_mean))
+            marker = "  <-- best" if means[(lr, horizon)] == best_mean else ""
+            lines.append(f"  lr={lr:<9g}@{horizon:<7} n={len(vals)}  {cell}{marker}")
+        best_per_family[family] = (
+            best_mean,
+            min((lr, horizon) for (lr, horizon), m in means.items() if m == best_mean),
+        )
         lines.append("")
 
     ranking = sorted(best_per_family.items(), key=lambda kv: kv[1][0], reverse=higher_better)
-    lines.append("RANKING by best-tuned configuration:")
-    for rank, (family, (mean, lr)) in enumerate(ranking, 1):
+    lines.append("RANKING by best-tuned configuration (check @horizon matches!):")
+    for rank, (family, (mean, (lr, horizon))) in enumerate(ranking, 1):
         gap = ""
         if rank > 1:
             gap = f" ({mean - ranking[0][1][0]:+.2f})"
-        lines.append(f"  {rank}. {family:<10} best@lr={lr:g}: {mean:.2f}{gap}")
+        lines.append(f"  {rank}. {family:<10} best@lr={lr:g}@{horizon}: {mean:.2f}{gap}")
 
     report = "\n".join(lines)
     print(report)
