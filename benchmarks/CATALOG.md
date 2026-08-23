@@ -31,6 +31,7 @@ This file is the canonical inventory for benchmark entrypoints in the repository
 | `benchmarks/suites/comparison/t4_memory_benchmark.py` | `gpu_memory_training` | `end_to_end` | canonical | Single-GPU (T4/16 GB) peak-memory + quality comparison vs AdamW and bitsandbytes 8-bit; OOM-tolerant per optimizer |
 | `benchmarks/suites/comparison/t4_summarize.py` | `gpu_memory_training` | `diagnostic` | canonical | Aggregates t4_* bundles into mean±std across seeds/tags |
 | `benchmarks/suites/comparison/t4_loss_matched.py` | `gpu_memory_training` | `diagnostic` | canonical | Loss-matched metric comparison from trajectory histories (generalization at equal optimization progress) |
+| `benchmarks/suites/comparison/t4_lr_sweep.py` | `gpu_memory_training` | `diagnostic` | canonical | Per-optimizer LR fairness sweep (best-tuned comparison); resume-friendly, forwards extra flags to the benchmark |
 | `benchmarks/suites/optimizer_step/smoke_spatial_consistency.py` | `optimizer_step` | `smoke` | canonical | Fast consistency check for `SMO-Spatial` vs `SMO-Spatial-8bit` |
 | `benchmarks/suites/optimizer_step/benchmark_step_time.py` | `optimizer_step` | `microbenchmark` | canonical | Isolated optimizer-step timing for rapid iteration |
 

@@ -563,7 +563,7 @@ def main():
             metrics=result,
             extra={"workload": workload, "k_ratio": args.k_ratio, "metric_key": metric_key,
                    "low_peak": bool(args.low_peak), "protect_output": bool(args.protect_output),
-                   "permute_basis": bool(args.permute_basis)},
+                   "permute_basis": bool(args.permute_basis), "lr": args.lr},
         )
         runs.append(record)
 
