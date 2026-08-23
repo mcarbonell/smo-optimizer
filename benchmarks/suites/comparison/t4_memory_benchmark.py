@@ -110,13 +110,29 @@ def make_optimizer(name: str, model: nn.Module, lr: float, k_ratio: float, prote
     raise ValueError(f"Unknown optimizer: {name}")
 
 
+def _iter_tensors_unique(obj, seen=None):
+    """Yield every distinct tensor reachable through dicts/lists/tuples.
+
+    bitsandbytes >= 0.4x nests quantized state inside
+    __bnb_optimizer_quant_state__ dicts, so a shallow scan undercounts.
+    """
+    if seen is None:
+        seen = set()
+    if isinstance(obj, torch.Tensor):
+        if id(obj) not in seen:
+            seen.add(id(obj))
+            yield obj
+    elif isinstance(obj, dict):
+        for value in obj.values():
+            yield from _iter_tensors_unique(value, seen)
+    elif isinstance(obj, (list, tuple)):
+        for value in obj:
+            yield from _iter_tensors_unique(value, seen)
+
+
 def persistent_state_mb(optimizer) -> float:
     """Bytes reachable through state_dict() = what a checkpoint stores."""
-    total = 0
-    for state in optimizer.state_dict()["state"].values():
-        for value in state.values():
-            if isinstance(value, torch.Tensor):
-                total += value.numel() * value.element_size()
+    total = sum(t.numel() * t.element_size() for t in _iter_tensors_unique(optimizer.state_dict().get("state", {})))
     return total / (1024**2)
 
 
