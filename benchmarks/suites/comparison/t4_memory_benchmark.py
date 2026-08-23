@@ -524,6 +524,7 @@ def main():
     runs = []
     print(f"\n{'=' * 72}")
     print(f"T4 memory benchmark | suite={args.suite} device={device.type} amp={args.amp} seed={args.seed}")
+    print(f"lr={args.lr} k_ratio={args.k_ratio}")
     print(f"Optimizers: {opt_names}")
     print(f"{'=' * 72}")
 

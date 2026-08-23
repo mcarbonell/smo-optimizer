@@ -64,31 +64,34 @@ def family_of(variant: str) -> str:
 
 
 def launch(args, lrs, seeds, opts):
+    combos = [(opt, lr, seed) for opt in opts for lr in lrs for seed in seeds]
+    print(f"SWEEP PLAN: {len(combos)} combo(s) = {len(opts)} optimizers × {len(lrs)} lrs × {len(seeds)} seeds")
+    print(f"  optimizers: {opts}")
+    print(f"  lrs:        {lrs}")
+    print(f"  seeds:      {seeds}\n", flush=True)
     launched = skipped = 0
-    for opt in opts:
-        for lr in lrs:
-            for seed in seeds:
-                tag = f"lr{slug(lr)}_{opt}_s{seed}"
-                path = bundle_path(args.suite, tag)
-                if path.exists() and not args.force:
-                    print(f"[skip] {path.name} exists")
-                    skipped += 1
-                    continue
-                cmd = [
-                    sys.executable, "-m",
-                    "benchmarks.suites.comparison.t4_memory_benchmark",
-                    "--suite", args.suite,
-                    "--optimizers", opt,
-                    "--seed", str(seed),
-                    "--lr", repr(lr),
-                    "--tag", tag,
-                    *args.passthrough,
-                ]
-                print("[run]", " ".join(cmd), flush=True)
-                result = subprocess.run(cmd)
-                if result.returncode != 0:
-                    print(f"[warn] {tag} exited with {result.returncode}")
-                launched += 1
+    for opt, lr, seed in combos:
+        tag = f"lr{slug(lr)}_{opt}_s{seed}"
+        path = bundle_path(args.suite, tag)
+        if path.exists() and not args.force:
+            print(f"[skip] {path.name} exists")
+            skipped += 1
+            continue
+        cmd = [
+            sys.executable, "-m",
+            "benchmarks.suites.comparison.t4_memory_benchmark",
+            "--suite", args.suite,
+            "--optimizers", opt,
+            "--seed", str(seed),
+            "--lr", repr(lr),
+            "--tag", tag,
+            *args.passthrough,
+        ]
+        print("[run]", " ".join(cmd), flush=True)
+        result = subprocess.run(cmd)
+        if result.returncode != 0:
+            print(f"[warn] {tag} exited with {result.returncode}")
+        launched += 1
     print(f"\nlaunched={launched} skipped={skipped}")
 
 
