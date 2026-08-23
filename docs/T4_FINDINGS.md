@@ -171,6 +171,51 @@ Findings:
 - Caveats: single seed per combo (selection noise is symmetric; final numbers come from
   the multi-seed tuned star run below).
 
+### TUNED STAR RUN (decisive) — RESULT: headline reversed, method vindicated
+
+10 epochs × 3 seeds, per-optimizer lr selected on the 3-epoch sweep
+(adamw @6e-4, bnb @3e-4, smo/smo8bit @3e-3):
+
+| Seed | AdamW@6e-4 | bnb@3e-4 | SMO@3e-3 | SMO-8bit@3e-3 |
+|---|---|---|---|---|
+| 1234 | 65.54 | 69.93 | 64.57 | 62.67 |
+| 5678 | 65.83 | 70.97 | 66.69 | 65.79 |
+| 9012 | 65.48 | 71.05 | 61.10 | 56.86 |
+| **mean±std** | 65.62 ± 0.19 | **70.65 ± 0.63** | 64.12 ± 2.87 | 61.77 ± 4.47 |
+
+Comparison against each optimizer's best-known 10-epoch config:
+
+| Optimizer | @1e-3 untuned | tuned (this run) | best-known 10ep config |
+|---|---|---|---|
+| AdamW | 55.51 ± 1.23 | 65.62 ± 0.19 | 65.62 (tuned) |
+| bnb-AdamW8bit | 54.52 ± 0.70 | **70.65 ± 0.63** | **70.65 (tuned)** |
+| SMO | **68.40 ± 0.38** | 64.12 ± 2.87 | 68.40 (@1e-3!) |
+| SMO-8bit | **68.66 ± 0.14** | 61.77 ± 4.47 | 68.66 (@1e-3!) |
+
+Readings:
+
+1. **The +13 headline is dead.** It was mostly AdamW mistuned at 1e-3 over long
+   horizons (+10.1 from tuning alone). Best-known-per-optimizer ranking at 10ep:
+   **bnb 70.65 > SMO-8bit 68.66 > SMO 68.40 > AdamW 65.62**.
+2. **LR selection does NOT transfer across horizons — in both directions.** SMO's
+   3-epoch-selected lr (3e-3) is WORSE than its untuned 1e-3 at 10 epochs, with seed
+   variance exploding (σ 0.14→4.47 at 9012-unstable seed). Short-proxy tuning misled
+   SMO downward just as it had flattered everyone else upward. Any future claim needs
+   per-horizon tuning or explicit disclosure.
+3. **NEW ANOMALY: tuned bnb-8bit beats fp32 AdamW by +5.03** (σ=0.63). Literature says
+   8-bit should match, not win. Candidate explanations: quantization noise acting as
+   regularizer at the right step scale; interaction with this architecture/schedule.
+   Worth investigating on its own — if real and reproducible elsewhere, it strengthens
+   the portfolio thesis (structured perturbation helps vision) from an unexpected angle.
+4. **What survives untouched**: all memory-engineering claims (killer demo, low_peak,
+   persistent-state accounting — OOM does not depend on lr); the mechanism result H4
+   (tested at matched budget); H8 curve shapes; the loss-matched methodology; and the
+   3-epoch tuned regime where SMO still ranks #1 (+2.6).
+5. Honest current one-line verdict: *"With 98% less state and the lowest step-time
+   peak, SMO-8bit matches Adam-class optimizers' quality at equal budget and wins
+   short-budget regimes — but tuned bitsandbytes-8bit currently leads long-budget
+   vision quality."*
+
 ### CharGPT char-LM on tiny-shakespeare (~40M params, 1000 steps, seed=1234)
 
 | Optimizer | Val loss | Δ vs AdamW | Persistent state | Peak alloc |
@@ -253,15 +298,15 @@ Findings:
 - [x] LR fairness sweep — DONE: gap survives symmetric tuning (+2.68/+2.75 best-vs-best);
       H8 lr-window shift confirmed (AdamW/bnb peak at 3e-4 and collapse at 3e-3; SMO peaks
       at 3e-3); SGD-M dead at every grid point
-- [ ] **Tuned star run** (decisive) — **RUNNING** on Colab: 10 epochs × 3 seeds with
-      per-optimizer best lrs from the extended sweep. Three invocations per seed:
-      `--lr 0.0006 --optimizers adamw --tag tuned_adamw_s{seed}` ·
-      `--lr 0.0003 --optimizers bnb8bit --tag tuned_bnb_s{seed}` ·
-      `--lr 0.003 --optimizers smo,smo8bit --tag tuned_smo_s{seed}` (~100 min total).
-      README headline section has a marked placeholder for these numbers.
-- [ ] Optional: one sgdm@6e-2 probe to bracket its curve for the fairness figure
+- [x] **Tuned star run** — DONE. Headline reversed: tuned bnb-8bit leads (70.65±0.63);
+      SMO's best-known 10ep config remains @1e-3 (68.40±0.38). LR selection does not
+      transfer across horizons (see star-run section). Memory/mechanism claims unaffected.
+- [ ] **SMO 10ep lr refinement**: probe {1.5e-3, 2e-3} × seed 1234 (~8 min each) — its
+      10ep-optimal lr was never measured; the 3e-3 choice came from a 3ep proxy that
+      demonstrably fails to transfer
+- [ ] **bnb anomaly investigation**: why does tuned bnb-8bit beat fp32 AdamW by +5?
+      Reproduce on CIFAR-100 / another architecture before believing it
 - [ ] H4: add 2 extra seeds to the permute ablation (8 min each)
-- [ ] Optional: finer lr grid around optima ({6e-4, 6e-3}) for H8 curve shapes; CharGPT
-      k=0.5 + protect_output combined; CharGPT ≥3 fresh seeds
+- [ ] Optional: sgdm@6e-2 bracket already done; finer grid polish deferred
 - [ ] Port row-banded update to SMO-Spatial (same transient bottleneck there:
       stacked pooling input + resident full-size reconstruction buffers)

@@ -6,15 +6,17 @@
 SMO is a research optimizer for PyTorch that compresses Adam's moment states
 (`exp_avg`, `exp_avg_sq`) with **structured spatial pooling** plus optional
 **INT8 block-wise quantization**, cutting persistent optimizer state by
-**93–98%** — and, in vision-from-scratch regimes, *improving* optimization
-quality over tuned AdamW and bitsandbytes-8bit while training models up to
-~700M parameters on a single free-tier T4.
+**93–98%** and step-time peak memory (row-banded update), while matching
+Adam-class quality at equal budget — and beating every tuned baseline in
+short-budget vision training. This repository is also a working example of
+adversarial self-evaluation: the campaign's fairness protocol reversed its own
+headline result, and that autopsy is documented in full.
 
 ---
 
 ## 🎯 Headline results (NVIDIA T4, TinyViT/CIFAR-10)
 
-### Quality vs every best-tuned baseline
+### Quality vs every best-tuned baseline (short-budget regime)
 
 LR-fairness sweep (`benchmarks/suites/comparison/t4_lr_sweep.py`), each optimizer
 at its own best learning rate, ViT 3 epochs:
@@ -27,18 +29,21 @@ at its own best learning rate, ViT 3 epochs:
 | 4 | bnb-AdamW8bit | 57.29 | 3e-4 |
 | 5 | SGD-M (momentum 0.9) | 52.62 | 6e-2 |
 
-At the longer budget (10 epochs, lr=1e-3 for all variants, 3 seeds):
+At the longer budget (10 epochs, 3 seeds, per-optimizer tuned LRs):
 
-| Optimizer | mean ± std | Δ vs AdamW |
+| Optimizer | best-known acc (10 ep) | config |
 |---|---|---|
-| AdamW-fp32 | 55.51 ± 1.23 | — |
-| bnb-AdamW8bit | 54.52 ± 0.70 | −0.99 |
-| **SMO k=0.25** | **68.40 ± 0.38** | **+12.88** |
-| **SMO-8bit k=0.25** | **68.66 ± 0.14** | **+13.15** |
+| **bnb-AdamW8bit** | **70.65 ± 0.63** | lr 3e-4 |
+| SMO-8bit k=0.25 | 68.66 ± 0.14 | lr 1e-3 |
+| SMO k=0.25 | 68.40 ± 0.38 | lr 1e-3 |
+| AdamW-fp32 | 65.62 ± 0.19 | lr 6e-4 |
 
-> ⚠️ **In flight:** 10-epoch × 3-seed rerun with per-optimizer tuned LRs
-> (AdamW/bnb @ 6e-4·3e-4, SMO @ 3e-3). This section will carry the tuned,
-> multi-seed headline numbers when it lands. See `docs/T4_FINDINGS.md`.
+**Honest reading**: under symmetric tuning, bitsandbytes-8bit currently leads long-budget
+vision quality; SMO-8bit matches Adam-class quality (±3) with **44× less state**, wins the
+short-budget regime, and is the only option that also minimizes step-time peak memory.
+A methodological finding from this campaign: **LRs selected on short-horizon proxies do
+not transfer to longer budgets — in both directions** (it inflated our own initial +13
+claim; see `docs/T4_FINDINGS.md` for the full autopsy).
 
 ### Loss-matched generalization frontier
 
