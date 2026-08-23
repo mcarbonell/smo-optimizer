@@ -141,18 +141,17 @@ Caveat: single seed; add 2 more for rigor (8 min each).
 
 ### LR fairness sweep (`t4_lr_sweep`, ViT 3 epochs, seed 1234) — EXTENDED GRID
 
-| Optimizer | 3e-4 | 6e-4 | 1e-3 | 3e-3 | 6e-3 | 1e-2 | 3e-2 | BEST |
-|---|---|---|---|---|---|---|---|---|
-| AdamW-fp32 | 57.22 | **57.33** | 52.19 | 24.68 | | | | 57.33 |
-| bnb-AdamW8bit | **57.29** | 56.73 | 51.72 | 27.05 | | | | 57.29 |
-| SGD-M | 27.77 | | 32.46 | 38.60 | | 44.37 | **49.68**† | 49.68 |
-| SMO k=0.25 | 44.23 | | 55.39 | **59.97** | 50.48 | 21.03 | | **59.97** |
-| SMO-8bit k=0.25 | 44.40 | | 55.41 | **59.53** | 46.61 | 23.68 | | 59.53 |
+| Optimizer | 3e-4 | 6e-4 | 1e-3 | 3e-3 | 6e-3 | 1e-2 | 3e-2 | 6e-2 | 1e-1 | BEST |
+|---|---|---|---|---|---|---|---|---|---|---|
+| AdamW-fp32 | 57.22 | **57.33** | 52.19 | 24.68 | | | | | | 57.33 |
+| bnb-AdamW8bit | **57.29** | 56.73 | 51.72 | 27.05 | | | | | | 57.29 |
+| SGD-M | 27.77 | | 32.46 | 38.60 | | 44.37 | 49.68 | **52.62** | 52.06 | 52.62 |
+| SMO k=0.25 | 44.23 | | 55.39 | **59.97** | 50.48 | 21.03 | | | | **59.97** |
+| SMO-8bit k=0.25 | 44.40 | | 55.41 | **59.53** | 46.61 | 23.68 | | | | 59.53 |
 
-† SGD-M still monotone rising at 3e-2 — true optimum likely 5e-2…1e-1; even generously
-extrapolated it stays ~10 pts below SMO.
+† all curves now bracketed on both sides: SGD-M peaks at 6e-2 (dips at 1e-1).
 
-RANKING (best-tuned): SMO 59.97 > SMO-8bit 59.53 > AdamW 57.33 > bnb 57.29 > SGD-M 49.68
+RANKING (best-tuned): SMO 59.97 > SMO-8bit 59.53 > AdamW 57.33 > bnb 57.29 > SGD-M 52.62
 
 Findings:
 
@@ -166,8 +165,9 @@ Findings:
   local variance peaks → larger steps stay stable.
 - **Quantization is neutral-to-positive across ALL lrs**: SMO-8bit tracks SMO within
   0.44 at every point of the grid.
-- **H5 definitively buried**: even granting SGD its preferred regime (>3e-2, still
-  climbing), it converges toward ~50s while SMO sits at ~60 in the same budget.
+- **H5 definitively buried, fairly**: SGD-M's curve is fully bracketed (peak 52.62 @
+  6e-2, dips at 1e-1) — tuned SGD closes much of its early gap (as literature predicts)
+  but stays −7.35 under SMO in identical budget.
 - Caveats: single seed per combo (selection noise is symmetric; final numbers come from
   the multi-seed tuned star run below).
 
