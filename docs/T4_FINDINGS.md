@@ -27,28 +27,30 @@ true value ≈ 1 byte/param + scales.
 Seeds: 1234, 5678, 9012. Determinism verified: seed 1234 reproduces metrics exactly.
 Effect size +2.6…+2.8 with σ≈0.3 → z ≈ 5–9. **Not noise.**
 
-### TinyViT CIFAR-10, 10 epochs (seeds 1234, 5678; 9012 running)
+### TinyViT CIFAR-10, 10 epochs — COMPLETE (seeds 1234, 5678, 9012)
 
-| Optimizer | seed 1234 | seed 5678 | mean | Δ vs AdamW |
-|---|---|---|---|---|
-| AdamW-fp32 | 54.27 | 56.72 | 55.50 | — |
-| bnb-AdamW8bit | 54.05 | 55.30 | 54.68 | −0.82 |
-| **SMO k=0.25** | 68.38 | 68.03 | **68.21** | **+12.71** |
-| **SMO-8bit k=0.25** | 68.53 | 68.81 | **68.67** | **+13.17** |
+| Optimizer | s1234 | s5678 | s9012 | mean±std | Δ vs AdamW |
+|---|---|---|---|---|---|
+| AdamW-fp32 | 54.27 | 56.72 | 55.53 | 55.51 ± 1.23 | — |
+| bnb-AdamW8bit | 54.05 | 55.30 | 54.21 | 54.52 ± 0.70 | −0.99 |
+| **SMO k=0.25** | 68.38 | 68.03 | 68.78 | **68.40 ± 0.38** | **+12.88** |
+| **SMO-8bit k=0.25** | 68.53 | 68.81 | 68.63 | **68.66 ± 0.14** | **+13.15** |
 
 Key observations:
 
 - **H2 (advantage decays with training) definitively refuted**: the gap GROWS from +2.7
   (3 epochs) to +13.2 (10 epochs). Whatever the mechanism, it compounds with training time.
-- **Cross-seed variance collapse**: SMO/SMO-8bit finals span 0.78 pts across seeds
-  (68.03–68.81) while AdamW spans 2.45 (54.27–56.72). Smoothing appears to make the
-  optimization trajectory itself less seed-dependent.
+- **Cross-seed variance collapse**: SMO-8bit spans 0.28 pts across seeds (σ=0.14) while
+  AdamW spans 2.45 (σ=1.23). Smoothing makes the optimization endpoint nearly
+  seed-independent — a denoising signature in itself.
 - **Frontier decomposition (H7)**: at AdamW's *best* train loss (~1.21–1.27), SMO sits at
-  ~56.6% acc (epoch ~4) — only +2.3 over AdamW's endpoint. The remaining ~11 points come
-  from SMO continuing to descend train loss (to ~0.90) where AdamW stalls within budget.
+  ~56.6% acc (epoch ~4) — only ~+2 over AdamW's endpoint. The remaining ~11 points come
+  from SMO continuing to descend train loss (to ~0.89) where AdamW stalls within budget.
   So: modest generalization-at-equal-loss gain PLUS substantially faster/better loss
   descent — a frontier shift, not a regularization trade.
 - bnb state_MB measures correctly here (27.85 MB, −74.4% — post-fix runs).
+- Effect size vs seed noise: Δ=+13.15 with σ_SMO8bit=0.14, σ_AdamW=1.23 → SE(diff)≈0.73 →
+  z≈18. Beyond any reasonable doubt at this scale/config.
 
 ### CharGPT char-LM on tiny-shakespeare (~40M params, 1000 steps, seed=1234)
 
