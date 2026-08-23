@@ -106,11 +106,13 @@ class SMO8bit(Optimizer):
                 state = self.state[p]
                 k_ratio = group['k_ratio']
                 block_size = group['block_size']
+                # Per-param-group opt-out: {"compress": False} forces dense Adam moments
+                use_compression = group.get('compress', True)
 
                 # Initialization
                 if len(state) == 0:
                     state['step'] = 0
-                    if grad.dim() == 2 and grad.shape[0] >= 32 and grad.shape[1] >= 32:
+                    if use_compression and grad.dim() == 2 and grad.shape[0] >= 32 and grad.shape[1] >= 32:
                         state['is_compressed'] = True
                         state['orig_shape'] = grad.shape
                         new_h = max(1, int(grad.shape[0] * k_ratio))

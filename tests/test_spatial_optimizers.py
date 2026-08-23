@@ -56,6 +56,24 @@ class SpatialOptimizerTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             optimizer.step()
 
+    def test_compress_false_group_matches_dense_adam(self):
+        torch.manual_seed(7)
+        param_smo = torch.nn.Parameter(torch.randn(64, 64))
+        param_adam = torch.nn.Parameter(param_smo.detach().clone())
+
+        opt_smo = SMO([{"params": [param_smo], "compress": False}], lr=1e-3)
+        opt_adam = torch.optim.Adam([param_adam], lr=1e-3)
+
+        for _ in range(5):
+            grad = torch.randn(64, 64)
+            param_smo.grad = grad.clone()
+            param_adam.grad = grad.clone()
+            opt_smo.step()
+            opt_adam.step()
+
+        self.assertTrue(torch.allclose(param_smo, param_adam, atol=1e-6))
+        self.assertFalse(opt_smo.state[param_smo]["is_compressed"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -85,17 +85,28 @@ def resolve_device(name: str) -> torch.device:
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def make_optimizer(name: str, params, lr: float, k_ratio: float):
+def make_optimizer(name: str, model: nn.Module, lr: float, k_ratio: float, protect_output: bool = False):
+    """Build an optimizer; for SMO variants optionally exclude embedding/head params."""
     if name == "adamw":
-        return torch.optim.AdamW(params, lr=lr, betas=(0.9, 0.999), eps=1e-8)
+        return torch.optim.AdamW(model.parameters(), lr=lr, betas=(0.9, 0.999), eps=1e-8)
     if name == "bnb8bit":
         if not HAS_BNB:
             raise RuntimeError("bitsandbytes not installed: pip install bitsandbytes")
-        return bnb.optim.AdamW8bit(params, lr=lr, betas=(0.9, 0.999))
-    if name == "smo":
-        return SMO(params, lr=lr, k_ratio=k_ratio)
-    if name == "smo8bit":
-        return SMO8bit(params, lr=lr, k_ratio=k_ratio)
+        return bnb.optim.AdamW8bit(model.parameters(), lr=lr, betas=(0.9, 0.999))
+    if name in ("smo", "smo8bit"):
+        cls = SMO if name == "smo" else SMO8bit
+        if not protect_output:
+            return cls(model.parameters(), lr=lr, k_ratio=k_ratio)
+        protected, regular = [], []
+        for pname, p in model.named_parameters():
+            (protected if ("emb" in pname or "head" in pname) else regular).append(p)
+        groups = [
+            *([{"params": regular, "compress": True}] if regular else []),
+            *([{"params": protected, "compress": False}] if protected else []),
+        ]
+        print(f"  protect_output: {sum(p.numel() for p in protected):,} protected / "
+              f"{sum(p.numel() for p in regular):,} compressed params")
+        return cls(groups, lr=lr, k_ratio=k_ratio)
     raise ValueError(f"Unknown optimizer: {name}")
 
 
@@ -229,7 +240,7 @@ def run_gpt(args, opt_name: str, device: torch.device) -> dict:
         y = torch.stack([data[i + 1 : i + 1 + args.block_size] for i in ix]).to(device)
         return x, y
 
-    optimizer = make_optimizer(opt_name, model.parameters(), args.lr, args.k_ratio)
+    optimizer = make_optimizer(opt_name, model, args.lr, args.k_ratio, getattr(args, "protect_output", False))
     scheduler = build_schedule(optimizer, warmup=100, total_steps=args.steps)
     scaler = torch.amp.GradScaler("cuda", enabled=args.amp and device.type == "cuda")
 
@@ -366,7 +377,7 @@ def run_vit(args, opt_name: str, device: torch.device) -> dict:
     model = TinyViT(32, args.patch, 10, args.width, args.depth, args.heads).to(device)
     n_params = sum(p.numel() for p in model.parameters())
 
-    optimizer = make_optimizer(opt_name, model.parameters(), args.lr, args.k_ratio)
+    optimizer = make_optimizer(opt_name, model, args.lr, args.k_ratio, getattr(args, "protect_output", False))
     steps_per_epoch = len(train_loader)
     scheduler = build_schedule(optimizer, warmup=max(1, steps_per_epoch // 5), total_steps=steps_per_epoch * args.epochs)
     scaler = torch.amp.GradScaler("cuda", enabled=autocast_on)
@@ -422,6 +433,9 @@ def main():
     parser.add_argument("--seed", type=int, default=1234)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--k_ratio", type=float, default=0.25)
+    parser.add_argument("--protect_output", action="store_true",
+                        help="SMO variants: keep embedding/head params on dense Adam moments")
+    parser.add_argument("--tag", type=str, default="", help="Suffix for result filenames (multi-seed / ablations)")
     parser.add_argument("--amp", action="store_true", help="fp16 autocast for fwd/bwd (states stay fp32)")
     parser.add_argument("--eval_interval", type=int, default=100)
     parser.add_argument("--limit_batches", type=int, default=0, help="Cap train batches per epoch (smoke)")
@@ -536,9 +550,10 @@ def main():
             savings = (1 - s / base_state) * 100 if base_state > 0 else 0.0
             print(f"  {r['variant']}: {s} MB ({savings:.1f}% reduction)")
 
+    suffix = f"_{args.tag}" if args.tag else ""
     aggregate, paths = write_benchmark_bundle(
-        aggregate_filename=f"t4_{args.suite}_memory_results.json",
-        suite_name=f"t4_gpu_memory_{args.suite}",
+        aggregate_filename=f"t4_{args.suite}_memory_results{suffix}.json",
+        suite_name=f"t4_gpu_memory_{args.suite}{suffix}",
         benchmark_family="gpu_memory_training",
         summary={"suite": args.suite, "workload": workload, "amp": args.amp, "seed": args.seed},
         runs=runs,
