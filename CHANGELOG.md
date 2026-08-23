@@ -8,11 +8,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **T4 GPU campaign tooling** (`benchmarks/suites/comparison/`):
+  - `t4_memory_benchmark.py` — peak-memory + quality comparison vs AdamW/bnb-8bit/SGD-M;
+    OOM-tolerant per optimizer; trajectory logging; per-group `compress` opt-out;
+    `--protect_output`, `--low_peak`, `--permute_basis`, `--tag`
+  - `t4_lr_sweep.py` — per-optimizer LR fairness sweep, best-tuned ranking, resume-safe
+  - `t4_summarize.py` — mean±std aggregation across seed bundles (dedup by seed)
+  - `t4_loss_matched.py` — loss-matched generalization analysis from trajectories
+  - `runners/colab/t4_benchmark_colab.ipynb` — one-click Colab/Kaggle notebook
+- SMO8bit `low_peak=True`: row-banded compress/update with no full-size temporaries
+  (step peak ~21 → ~9 B/param; bit-exact vs monolithic in tests)
+- MIT `LICENSE`; `pyproject.toml` (`testpaths=tests`)
+- Spectral transform unit tests (`tests/test_spectral_transforms.py`, ported from scratch)
 - Deterministic seeding across all canonical benchmarks (`--seed` / `--seeds` flags)
 - Multi-seed aggregation (mean±std) in microbenchmarks
 - GPU synchronization infrastructure (`get_sync_fn` for CUDA/DirectML/CPU)
 - Memory reporting for CUDA in optimizer-step microbench
 - **Profiling suite** `profiles/profile_smo_step.py`: manual timer decomposition + torch.profiler integration
+
+### Changed
+- Persistent-state accounting now walks nested containers (fixes bnb reporting 0 MB)
+- Benchmark banner records lr/k_ratio; results carry lr for sweep analysis
+- README rewritten around T4 campaign evidence
+
+### Fixed
+- SMO8bit dequantization dtype (fp16/bf16 params no longer crash)
+- Hadamard recursion bug in legacy spectral scratch tests
+- find_packages leaking tests/benchmarks/spectral into site-packages
 
 ### Changed
 - `benchmarks/suites/optimizer_step/benchmark_step_time.py`: multi-shape (64–4096), device-aware, warmup + memory stats

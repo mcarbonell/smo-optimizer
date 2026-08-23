@@ -253,11 +253,12 @@ Findings:
 - [x] LR fairness sweep — DONE: gap survives symmetric tuning (+2.68/+2.75 best-vs-best);
       H8 lr-window shift confirmed (AdamW/bnb peak at 3e-4 and collapse at 3e-3; SMO peaks
       at 3e-3); SGD-M dead at every grid point
-- [ ] **Tuned star run** (decisive): 10 epochs × 3 seeds with per-optimizer best lrs
-      from the extended sweep. Three invocations per seed:
+- [ ] **Tuned star run** (decisive) — **RUNNING** on Colab: 10 epochs × 3 seeds with
+      per-optimizer best lrs from the extended sweep. Three invocations per seed:
       `--lr 0.0006 --optimizers adamw --tag tuned_adamw_s{seed}` ·
       `--lr 0.0003 --optimizers bnb8bit --tag tuned_bnb_s{seed}` ·
-      `--lr 0.003 --optimizers smo,smo8bit --tag tuned_smo_s{seed}` (~100 min total)
+      `--lr 0.003 --optimizers smo,smo8bit --tag tuned_smo_s{seed}` (~100 min total).
+      README headline section has a marked placeholder for these numbers.
 - [ ] Optional: one sgdm@6e-2 probe to bracket its curve for the fairness figure
 - [ ] H4: add 2 extra seeds to the permute ablation (8 min each)
 - [ ] Optional: finer lr grid around optima ({6e-4, 6e-3}) for H8 curve shapes; CharGPT
