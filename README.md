@@ -110,6 +110,9 @@ python -m benchmarks.suites.training.benchmark_minillm --max_iters 200 --seed 12
 # Spectral variants baseline (CIFAR-10, 3 epochs)
 python -m benchmarks.suites.spectral.benchmark_spectral_cpu --epochs 3 --seed 1234
 
+# Single-GPU (T4/Colab/Kaggle): peak memory + quality vs AdamW & bnb-8bit
+python -m benchmarks.suites.comparison.t4_memory_benchmark --suite gpt --steps 1000 --amp --seed 1234
+
 # Profiling: step breakdown (CPU)
 python profiles/profile_smo_step.py --shape 1024,1024 --steps 100 --seed 1234
 ```

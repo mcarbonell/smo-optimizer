@@ -28,6 +28,7 @@ This file is the canonical inventory for benchmark entrypoints in the repository
 | `benchmarks/suites/spectral/benchmark_dct_fix.py` | `end_to_end_training` | `diagnostic` | canonical | Targeted validation of the DCT smoothing fix |
 | `benchmarks/suites/comparison/exhaustive_benchmark.py` | `end_to_end_training` | `end_to_end` | canonical | Multi-seed Modal benchmark, still exploratory |
 | `benchmarks/suites/comparison/exhaustive_benchmark_local.py` | `end_to_end_training` | `end_to_end` | canonical | Multi-seed local DirectML benchmark, still exploratory |
+| `benchmarks/suites/comparison/t4_memory_benchmark.py` | `gpu_memory_training` | `end_to_end` | canonical | Single-GPU (T4/16 GB) peak-memory + quality comparison vs AdamW and bitsandbytes 8-bit; OOM-tolerant per optimizer |
 | `benchmarks/suites/optimizer_step/smoke_spatial_consistency.py` | `optimizer_step` | `smoke` | canonical | Fast consistency check for `SMO-Spatial` vs `SMO-Spatial-8bit` |
 | `benchmarks/suites/optimizer_step/benchmark_step_time.py` | `optimizer_step` | `microbenchmark` | canonical | Isolated optimizer-step timing for rapid iteration |
 
