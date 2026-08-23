@@ -89,6 +89,13 @@ Effect size +2.6…+2.8 with σ≈0.3 → z ≈ 5–9. **Not noise.**
 - **H6 — flatness bias à la SAM:** updating weights toward neighborhood consensus
   biases toward flat minima; SAM's known profile (big vision gains, neutral/negative LM)
   matches the observed regime split.
+- **H7 — frontier improvement (not just endpoint):** preliminary loss-matched reading of
+  the 10-epoch run suggests SMO reaches *better test acc at equal train loss* (+1.5…+2)
+  AND descends the train loss faster — i.e., it improves the whole loss↔generalization
+  frontier rather than trading fit for generalization. A pure implicit-regularizer story
+  would predict the opposite trade; a de-adaptivization story predicts exactly this.
+  Quantify with `t4_loss_matched` on runs that log `history` (added 2026-08-23; earlier
+  bundles have no history field).
 
 ## Pending experiments
 

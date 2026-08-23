@@ -287,6 +287,7 @@ def run_gpt(args, opt_name: str, device: torch.device) -> dict:
     t_start = time.perf_counter()
     tokens_seen = 0
     final_val = float("nan")
+    history = []
     for step in range(args.steps):
         x, y = get_batch(train_data)
         ctx = torch.autocast("cuda", dtype=torch.float16, enabled=args.amp and device.type == "cuda")
@@ -303,6 +304,7 @@ def run_gpt(args, opt_name: str, device: torch.device) -> dict:
         tokens_seen += x.numel()
         if (step + 1) % args.eval_interval == 0 or step == args.steps - 1:
             final_val = estimate(val_data)
+            history.append({"step": step + 1, "train_loss": round(loss.item(), 4), "val_loss": round(final_val, 4)})
             print(f"  [{opt_name}] step {step + 1}/{args.steps} train_loss {loss.item():.4f} val_loss {final_val:.4f}")
     wall = time.perf_counter() - t_start
 
@@ -314,6 +316,7 @@ def run_gpt(args, opt_name: str, device: torch.device) -> dict:
         "final_val_loss": round(final_val, 4),
         "tokens_per_s": round(tokens_seen / wall),
         "wall_s": round(wall, 1),
+        "history": history,
     }
     del model, optimizer
     return result
@@ -415,6 +418,7 @@ def run_vit(args, opt_name: str, device: torch.device) -> dict:
     t_start = time.perf_counter()
     images_seen = 0
     final_acc = 0.0
+    history = []
     for epoch in range(args.epochs):
         running = 0.0
         for bi, (images, labels) in enumerate(train_loader):
@@ -433,7 +437,9 @@ def run_vit(args, opt_name: str, device: torch.device) -> dict:
             images_seen += images.size(0)
             running += loss.item()
         final_acc = evaluate_vit(model, test_loader, device, n_test, autocast_on)
-        print(f"  [{opt_name}] epoch {epoch + 1}/{args.epochs} loss {running / max(1, bi + 1):.4f} test_acc {final_acc:.2f}%")
+        epoch_loss = running / max(1, bi + 1)
+        history.append({"epoch": epoch + 1, "train_loss": round(epoch_loss, 4), "test_acc": round(final_acc, 2)})
+        print(f"  [{opt_name}] epoch {epoch + 1}/{args.epochs} loss {epoch_loss:.4f} test_acc {final_acc:.2f}%")
     wall = time.perf_counter() - t_start
 
     result = {
@@ -444,6 +450,7 @@ def run_vit(args, opt_name: str, device: torch.device) -> dict:
         "final_test_acc": round(final_acc, 2),
         "images_per_s": round(images_seen / wall),
         "wall_s": round(wall, 1),
+        "history": history,
     }
     del model, optimizer
     return result
