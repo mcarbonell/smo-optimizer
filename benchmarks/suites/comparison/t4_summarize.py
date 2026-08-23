@@ -37,7 +37,8 @@ def main():
         print(f"No bundles matching t4_*_memory_results*.json in {RESULTS_DIR}")
         return
 
-    groups: dict[tuple, list] = defaultdict(list)
+    # (suite, variant) -> {seed: run}; later bundles win on duplicate seeds
+    groups: dict[tuple, dict] = defaultdict(dict)
     for path in files:
         bundle = json.loads(path.read_text(encoding="utf-8"))
         suite = bundle["summary"]["suite"]
@@ -45,15 +46,13 @@ def main():
             metrics = run["metrics"]
             if metrics.get("status") != "ok":
                 continue
-            groups[(suite, run["variant"])].append(
-                {
-                    "seed": run.get("seed"),
-                    "metric": metrics.get(run.get("metric_key", "")),
-                    "state_mb": metrics.get("persistent_state_mb"),
-                    "peak_mb": metrics.get("_peak_alloc_mb"),
-                    "throughput": metrics.get("tokens_per_s") or metrics.get("images_per_s"),
-                }
-            )
+            groups[(suite, run["variant"])][run.get("seed")] = {
+                "seed": run.get("seed"),
+                "metric": metrics.get(run.get("metric_key", "")),
+                "state_mb": metrics.get("persistent_state_mb"),
+                "peak_mb": metrics.get("_peak_alloc_mb"),
+                "throughput": metrics.get("tokens_per_s") or metrics.get("images_per_s"),
+            }
 
     lines = []
     header = (
@@ -62,7 +61,8 @@ def main():
     )
     lines.append(header)
     lines.append("-" * len(header))
-    for (suite, variant), runs in sorted(groups.items()):
+    for (suite, variant), by_seed in sorted(groups.items()):
+        runs = list(by_seed.values())
         def agg(key, digits=2):
             vals = [r[key] for r in runs if isinstance(r[key], (int, float))]
             if not vals:

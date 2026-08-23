@@ -1,7 +1,11 @@
 # TODO.md - ROADMAP Progress Tracker
 
-## Current Status (2026-05-07)
+## Current Status (2026-08-23)
 
+- 🔬 **T4 GPU campaign (Kaggle)** — see `docs/T4_FINDINGS.md`
+   - **Multi-seed result: SMO/SMO-8bit beat AdamW AND bnb-8bit by +2.6/+2.8 acc on TinyViT/CIFAR-10** (55.5±0.3 vs 52.7±0.6), with 93–98% less persistent state
+   - CharGPT: compression hurts LM quality (+0.21…0.49 val loss); `--protect_output` hypothesis pending
+   - Peak-memory during training only improves for SMO-8bit; SMO-Spatial peak exceeds AdamW (resident buffers)
 - ✅ **Phase 2: Correctness & Measurement** — COMPLETE (2026-05-06)
    - Baselines completos: MNIST, CIFAR-10, MiniGPT, Spectral (Walsh/DCT)
    - Memory savings: 63–93% según variant y tarea
