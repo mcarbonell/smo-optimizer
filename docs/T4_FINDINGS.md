@@ -27,6 +27,50 @@ true value ≈ 1 byte/param + scales.
 Seeds: 1234, 5678, 9012. Determinism verified: seed 1234 reproduces metrics exactly.
 Effect size +2.6…+2.8 with σ≈0.3 → z ≈ 5–9. **Not noise.**
 
+### TinyViT CIFAR-10, 10 epochs + SGD-M baseline (`--tag hist`, seed 1234)
+
+| Optimizer | final acc | state MB |
+|---|---|---|
+| AdamW-fp32 | 54.27 | 108.7 |
+| bnb-AdamW8bit | 54.05 | 27.9 |
+| **SGD-M (lr=1e-3)** | **39.99** | 54.3 |
+| **SMO k=0.25** | **68.38** | 7.4 |
+| **SMO-8bit k=0.25** | **68.53** | 2.5 |
+
+**Loss-matched analysis** (test_acc at equal train loss, interpolated):
+
+| train_loss | AdamW | SGD-M | SMO | SMO-8bit | bnb |
+|---|---|---|---|---|---|
+| 1.654 | 39.98 | +0.01 | **+7.33** | **+7.52** | +2.49 |
+| 1.689 | 38.87 | +0.12 | **+7.29** | **+7.45** | +2.77 |
+| 1.759 | 38.34 | −2.44 | **+5.52** | **+5.65** | +0.75 |
+| 1.830 | 37.80 | −3.81 | **+3.75** | **+3.84** | −1.27 |
+
+Key observations:
+
+- **H5 (de-adaptivization toward SGD) FALSIFIED in its simple form**, two ways:
+  (a) SGD-M's own frontier is *worse* than AdamW's at matched loss (−1.2…−3.8), so
+  "moving toward SGD dynamics" cannot explain SMO's *better* frontier;
+  (b) SMO lands +14 above SGD-M at this budget instead of between the two.
+  CAVEAT before full burial: lr=1e-3 is likely mistuned for SGD-M (typically wants
+  10–50× more); the LR-sweep must confirm tuned-SGD doesn't flip this picture.
+- **H7 quantified and confirmed**: SMO's loss-matched advantage is large (+3.8…+7.5),
+  positive across the whole shared range, and *widens* as fit improves (+3.8 @ loss 1.83
+  → +7.5 @ 1.65). Combined with faster descent, the total endpoint gap (+14) decomposes
+  into a genuine frontier shift PLUS compounding speed.
+- **bnb also improves the frontier mildly** (+0.75…+2.77): quantization noise alone buys
+  a little generalization-at-equal-fit, consistent with H3 — but an order of magnitude
+  less than spatial smoothing. Whatever SMO does, quantization-only does not replicate.
+- Surviving mechanism candidates: (i) *state denoising* — low-pass filtering the moment
+  ESTIMATES while preserving Adam-style adaptivity structure (unlike SGD, which drops
+  adaptivity wholesale); (ii) effective-LR redistribution from smoothed exp_avg_sq;
+  (iii) locality prior (H4 `permute_basis` test now the sharpest discriminator).
+
+- Surviving mechanism candidates: (i) *state denoising* — low-pass filtering the moment
+  ESTIMATES while preserving Adam-style adaptivity structure (unlike SGD, which drops
+  adaptivity wholesale); (ii) effective-LR redistribution from smoothed exp_avg_sq;
+  (iii) locality prior (H4 `permute_basis` test now the sharpest discriminator).
+
 ### TinyViT CIFAR-10, 10 epochs — COMPLETE (seeds 1234, 5678, 9012)
 
 | Optimizer | s1234 | s5678 | s9012 | mean±std | Δ vs AdamW |
