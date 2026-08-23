@@ -114,5 +114,51 @@ class LowPeakBandedUpdateTests(unittest.TestCase):
         self.assertTrue(torch.allclose(param_mono, param_band, atol=1e-6))
 
 
+class PermuteBasisTests(unittest.TestCase):
+    def test_permute_basis_is_identity_at_k1(self):
+        # k=1 makes pooling/interpolation the identity and block_size=1 makes
+        # quantization exact, so the basis permutation must cancel out.
+        torch.manual_seed(5)
+        init = torch.randn(64, 64)
+        p_plain = torch.nn.Parameter(init.clone())
+        p_perm = torch.nn.Parameter(init.clone())
+        o_plain = SMO8bit([p_plain], lr=1e-3, k_ratio=1.0, block_size=1)
+        o_perm = SMO8bit([p_perm], lr=1e-3, k_ratio=1.0, block_size=1, permute_basis=True)
+
+        torch.manual_seed(9)
+        for _ in range(3):
+            grad = torch.randn(64, 64)
+            p_plain.grad = grad.clone()
+            p_perm.grad = grad.clone()
+            o_plain.step()
+            o_perm.step()
+
+        self.assertTrue(torch.allclose(p_plain, p_perm, atol=1e-6))
+
+    def test_permute_basis_changes_update_at_k025(self):
+        torch.manual_seed(5)
+        init = torch.randn(64, 64)
+        p_plain = torch.nn.Parameter(init.clone())
+        p_perm = torch.nn.Parameter(init.clone())
+        o_plain = SMO8bit([p_plain], lr=1e-3, k_ratio=0.25)
+        o_perm = SMO8bit([p_perm], lr=1e-3, k_ratio=0.25, permute_basis=True)
+
+        torch.manual_seed(9)
+        max_diff = 0.0
+        for _ in range(3):
+            grad = torch.randn(64, 64)
+            p_plain.grad = grad.clone()
+            p_perm.grad = grad.clone()
+            o_plain.step()
+            o_perm.step()
+            max_diff = max(max_diff, (p_plain - p_perm).abs().max().item())
+
+        self.assertGreater(max_diff, 1e-4)
+
+    def test_permute_basis_rejects_low_peak(self):
+        with self.assertRaises(ValueError):
+            SMO8bit([torch.nn.Parameter(torch.zeros(32, 32))], low_peak=True, permute_basis=True)
+
+
 if __name__ == "__main__":
     unittest.main()

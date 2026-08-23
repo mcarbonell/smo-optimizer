@@ -64,7 +64,7 @@ except ImportError:
 SHAKESPEARE_URL = (
     "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
 )
-OPTIMIZER_NAMES = ["adamw", "bnb8bit", "smo", "smo8bit"]
+OPTIMIZER_NAMES = ["adamw", "bnb8bit", "sgdm", "smo", "smo8bit"]
 
 
 def set_seed(seed: int):
@@ -85,7 +85,7 @@ def resolve_device(name: str) -> torch.device:
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def make_optimizer(name: str, model: nn.Module, lr: float, k_ratio: float, protect_output: bool = False, low_peak: bool = False):
+def make_optimizer(name: str, model: nn.Module, lr: float, k_ratio: float, protect_output: bool = False, low_peak: bool = False, permute_basis: bool = False):
     """Build an optimizer; for SMO variants optionally exclude embedding/head params."""
     if name == "adamw":
         return torch.optim.AdamW(model.parameters(), lr=lr, betas=(0.9, 0.999), eps=1e-8)
@@ -93,11 +93,15 @@ def make_optimizer(name: str, model: nn.Module, lr: float, k_ratio: float, prote
         if not HAS_BNB:
             raise RuntimeError("bitsandbytes not installed: pip install bitsandbytes")
         return bnb.optim.AdamW8bit(model.parameters(), lr=lr, betas=(0.9, 0.999))
+    if name == "sgdm":
+        return torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9)
     if name in ("smo", "smo8bit"):
         cls = SMO if name == "smo" else SMO8bit
         kwargs = {}
         if name == "smo8bit" and low_peak:
             kwargs["low_peak"] = True
+        if name == "smo8bit" and permute_basis:
+            kwargs["permute_basis"] = True
         if not protect_output:
             return cls(model.parameters(), lr=lr, k_ratio=k_ratio, **kwargs)
         protected, regular = [], []
@@ -261,7 +265,8 @@ def run_gpt(args, opt_name: str, device: torch.device) -> dict:
 
     optimizer = make_optimizer(opt_name, model, args.lr, args.k_ratio,
                                getattr(args, "protect_output", False),
-                               getattr(args, "low_peak", False))
+                               getattr(args, "low_peak", False),
+                               getattr(args, "permute_basis", False))
     scheduler = build_schedule(optimizer, warmup=100, total_steps=args.steps)
     scaler = torch.amp.GradScaler("cuda", enabled=args.amp and device.type == "cuda")
 
@@ -400,7 +405,8 @@ def run_vit(args, opt_name: str, device: torch.device) -> dict:
 
     optimizer = make_optimizer(opt_name, model, args.lr, args.k_ratio,
                                getattr(args, "protect_output", False),
-                               getattr(args, "low_peak", False))
+                               getattr(args, "low_peak", False),
+                               getattr(args, "permute_basis", False))
     steps_per_epoch = len(train_loader)
     scheduler = build_schedule(optimizer, warmup=max(1, steps_per_epoch // 5), total_steps=steps_per_epoch * args.epochs)
     scaler = torch.amp.GradScaler("cuda", enabled=autocast_on)
@@ -460,6 +466,8 @@ def main():
                         help="SMO variants: keep embedding/head params on dense Adam moments")
     parser.add_argument("--low_peak", action="store_true",
                         help="SMO8bit: row-banded compress/update (no full-size temporaries)")
+    parser.add_argument("--permute_basis", action="store_true",
+                        help="SMO8bit: pool gradients in a random permuted basis (locality ablation)")
     parser.add_argument("--tag", type=str, default="", help="Suffix for result filenames (multi-seed / ablations)")
     parser.add_argument("--amp", action="store_true", help="fp16 autocast for fwd/bwd (states stay fp32)")
     parser.add_argument("--eval_interval", type=int, default=100)
@@ -513,7 +521,7 @@ def main():
     print(f"{'=' * 72}")
 
     for name in opt_names:
-        labels = {"adamw": "AdamW-fp32", "bnb8bit": "bnb-AdamW8bit",
+        labels = {"adamw": "AdamW-fp32", "bnb8bit": "bnb-AdamW8bit", "sgdm": f"SGD-M lr={args.lr}",
                   "smo": f"SMO k={args.k_ratio}", "smo8bit": f"SMO-8bit k={args.k_ratio}"}
         label = labels[name]
         if name == "smo8bit" and args.low_peak:
@@ -547,7 +555,8 @@ def main():
             steps=args.steps if args.suite == "gpt" else None,
             metrics=result,
             extra={"workload": workload, "k_ratio": args.k_ratio, "metric_key": metric_key,
-                   "low_peak": bool(args.low_peak), "protect_output": bool(args.protect_output)},
+                   "low_peak": bool(args.low_peak), "protect_output": bool(args.protect_output),
+                   "permute_basis": bool(args.permute_basis)},
         )
         runs.append(record)
 

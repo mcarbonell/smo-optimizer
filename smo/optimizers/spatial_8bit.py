@@ -41,10 +41,17 @@ class SMO8bit(Optimizer):
             shape to evenly divide the original (exact-pool path); other
             tensors silently fall back to the monolithic step.
         band_mb: Approximate per-band temporary budget in MB for low_peak.
+        permute_basis: If True, rows/columns of the gradient are randomly
+            permuted (fixed per-parameter, from the global RNG) before
+            spatial pooling, and the reconstruction is unpermuted. This
+            destroys neighborhood locality while keeping the compression
+            ratio — an ablation to test whether smoothing helps because
+            adjacent coordinates are correlated or for other reasons.
+            Incompatible with low_peak (raises ValueError).
     """
     def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8,
                  weight_decay=0, k_ratio=0.25, block_size=64,
-                 low_peak=False, band_mb=64.0):
+                 low_peak=False, band_mb=64.0, permute_basis=False):
         if not 0.0 <= lr:
             raise ValueError(f"Invalid learning rate: {lr}")
         if not 0.0 <= eps:
@@ -63,6 +70,9 @@ class SMO8bit(Optimizer):
         super(SMO8bit, self).__init__(params, defaults)
         self.low_peak = low_peak
         self.band_mb = float(band_mb)
+        if low_peak and permute_basis:
+            raise ValueError("permute_basis is not supported with low_peak")
+        self.permute_basis = permute_basis
 
     @staticmethod
     def _compress_2d(tensor, target_shape):
@@ -138,6 +148,9 @@ class SMO8bit(Optimizer):
                         state['m_q'], state['m_s'] = m_q, m_s
                         state['v_q'], state['v_s'] = v_q, v_s
                         state['comp_shape'] = comp_shape
+                        if self.permute_basis:
+                            state['row_perm'] = torch.randperm(grad.shape[0], device=grad.device)
+                            state['col_perm'] = torch.randperm(grad.shape[1], device=grad.device)
                     else:
                         state['is_compressed'] = False
                         state['exp_avg'] = torch.zeros_like(p, memory_format=torch.preserve_format)
@@ -159,8 +172,14 @@ class SMO8bit(Optimizer):
                     m = self._dequantize_blockwise(state['m_q'], state['m_s'], state['comp_shape'], state['comp_numel'], dtype=grad.dtype)
                     v = self._dequantize_blockwise(state['v_q'], state['v_s'], state['comp_shape'], state['comp_numel'], dtype=grad.dtype)
 
-                    # 2. Compress gradient
-                    g_comp, g_sq_comp = compress_2d_pair(grad, grad.square(), state['comp_shape'])
+                    # 2. Compress gradient (optionally in a permuted basis)
+                    if self.permute_basis:
+                        rp, cp = state['row_perm'], state['col_perm']
+                        g_eff = grad[rp][:, cp]
+                        g_comp, g_sq_comp = compress_2d_pair(g_eff, g_eff.square(), state['comp_shape'])
+                        del g_eff
+                    else:
+                        g_comp, g_sq_comp = compress_2d_pair(grad, grad.square(), state['comp_shape'])
 
                     # 3. Update moments (in float32)
                     m.mul_(beta1).add_(g_comp, alpha=1 - beta1)
@@ -169,6 +188,15 @@ class SMO8bit(Optimizer):
 
                     # 4. Upsample for weight update BEFORE re-quantizing
                     m_rec, v_rec = upsample_2d_pair(m, v, state['orig_shape'])
+
+                    # Undo the basis permutation so the update lands on the
+                    # original coordinates
+                    if self.permute_basis:
+                        inv_rp = torch.argsort(state['row_perm'])
+                        inv_cp = torch.argsort(state['col_perm'])
+                        m_rec = m_rec[inv_rp][:, inv_cp]
+                        v_rec = v_rec[inv_rp][:, inv_cp]
+
                     v_rec = torch.clamp(v_rec, min=0.0)
 
                     # 5. Re-quantize and store

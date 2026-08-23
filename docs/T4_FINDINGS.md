@@ -72,20 +72,34 @@ Effect size +2.6…+2.8 with σ≈0.3 → z ≈ 5–9. **Not noise.**
 
 - **H1 — output-layer smoothing harms LM.** PARTIALLY CONFIRMED: protects ~⅓ of the gap.
   Remaining levers: combine with k=0.5; accept LM as unfavorable regime.
-- **H2 — moment smoothing is an implicit regularizer in high-noise regimes.**
-  Supported by ViT result. Predicts: advantage shrinks with longer training / larger data /
-  heavier augmentation. Test: 10-epoch ViT runs. Pending.
+- **H2 — regularizer effect decays with training length.** REFUTED as stated
+  (2026-08-23, ViT 10 epochs, seed 1234, partial): at epoch 6 SMO leads AdamW by ~+13 acc
+  (63.5 vs 50.5) — the advantage GROWS late into training instead of fading. Revised:
+  whatever the mechanism is, it strengthens as LR decays / SNR drops.
 - **H3 — quantization adds beneficial dither.** Supported by finding 2. Test: block_size
   sweep on SMO-8bit. Pending.
+- **H4 — locality prior:** smoothing wins because pooling exploits correlated adjacent
+  coordinates. Test: `--permute_basis` (random fixed row/col permutation before pooling,
+  unpermuted after reconstruction). Prediction: ViT advantage collapses to ≈ bnb level.
+- **H5 — partial de-adaptivization toward SGD-like updates:** smoothed exp_avg_sq damps
+  per-coordinate adaptivity; Adam is known to generalize worse than SGD on vision
+  from-scratch tasks while being essential for LM. Test: add an `sgdm` baseline — if
+  SGD-M approaches SMO's ViT numbers, the "SMO pushes Adam toward SGD territory" story
+  gains support (and explains the LM/vision regime split elegantly).
+- **H6 — flatness bias à la SAM:** updating weights toward neighborhood consensus
+  biases toward flat minima; SAM's known profile (big vision gains, neutral/negative LM)
+  matches the observed regime split.
 
 ## Pending experiments
 
-- [x] CharGPT `--protect_output` (`--tag prot`) — H1 partial: −0.16 nats recovered
 - [ ] Killer demo, attempt 2 (needs `low_peak`, landed): e.g.
       `--d_model 1280 --layers 36 --block_size 256 --batch 8 --steps 200 --amp --low_peak`
       (~700M params: AdamW ≈ 14 GB static + activations → OOM; SMO-8bit lp ≈ 6.5 GB)
-- [ ] ViT long-run (10 epochs × 3 seeds) — does the regularizer effect decay? (H2)
+- [ ] ViT long-run (10 epochs × 3 seeds) — RUNNING; early epochs show growing advantage (see H2)
 - [ ] CharGPT k=0.5 + protect_output combined
 - [ ] CharGPT comparisons at ≥3 fresh seeds (currently single-seed)
 - [ ] Port row-banded update to SMO-Spatial (same transient bottleneck there:
       stacked pooling input + resident full-size reconstruction buffers)
+- [ ] H5 test: `sgdm` baseline on ViT (`--optimizers adamw,sgdm,smo,smo8bit`), incl. an lr
+      sweep for SGD-M (1e-2…5e-2) since the cosine schedule is tuned for Adam-scale lr
+- [ ] H4 test: `--permute_basis` on ViT (`--optimizers smo,smo8bit --permute_basis`)
