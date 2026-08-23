@@ -139,6 +139,35 @@ advantage vanishes entirely. Coherently explains the LM regression (embedding
 rows are semantically arbitrary neighbors → smoothing ≈ permuted smoothing).
 Caveat: single seed; add 2 more for rigor (8 min each).
 
+### LR fairness sweep (`t4_lr_sweep`, ViT 3 epochs, seed 1234)
+
+| Optimizer | lr=3e-4 | lr=1e-3 | lr=3e-3 | BEST |
+|---|---|---|---|---|
+| AdamW-fp32 | **57.22** | 52.19 | 24.68 | 57.22 |
+| bnb-AdamW8bit | **57.29** | 51.72 | 27.05 | 57.29 |
+| SGD-M | 27.77 | 32.46 | **38.60** | 38.60 |
+| SMO k=0.25 | 44.23 | 55.39 | **59.97** | **59.97** |
+| SMO-8bit k=0.25 | 44.40 | 55.41 | **59.53** | 59.53 |
+
+RANKING (best-tuned): SMO 59.97 > SMO-8bit 59.53 > bnb 57.29 > AdamW 57.22 > SGD-M 38.60
+
+Findings:
+
+- **The quality gap survives symmetric tuning**: +2.68/+2.75 over tuned bnb/AdamW
+  (was +3.2 untuned). Both SMO variants beat every baseline's *best* configuration.
+- **H8 (lr-window shift) CONFIRMED, single seed**: AdamW/bnb peak at 3e-4 and collapse
+  at 3e-3 (−30 pts); SMO peaks at 3e-3 and is still flat/climbing. Smoothing shifts the
+  usable-LR window upward and flattens sensitivity where Adam breaks. Practically:
+  SMO lets you train more aggressively. Mechanistic hint: pooled exp_avg_sq
+  underestimates local variance peaks → larger stable steps.
+- SMO itself was mistuned at 1e-3 (+4.6 available at 3e-3) — everyone gains from tuning,
+  SMO just gains more headroom on top.
+- SGD-M remains far behind at every grid point (best 38.60, still climbing but nowhere
+  near the pack): H5 stays dead for practical purposes.
+- Caveats: single seed per combo; coarse grid (SMO may prefer even higher lr;
+  AdamW may have a mild bump between 3e-4 and 1e-3). Neither caveat plausibly closes
+  a +2.7 gap, but the tuned 10-epoch rerun below is the honest confirmation.
+
 ### CharGPT char-LM on tiny-shakespeare (~40M params, 1000 steps, seed=1234)
 
 | Optimizer | Val loss | Δ vs AdamW | Persistent state | Peak alloc |
@@ -218,10 +247,16 @@ Caveat: single seed; add 2 more for rigor (8 min each).
 - [x] ViT long-run (10 epochs × 3 seeds) — DONE: gap +13.15±0.14, H2 refuted
 - [x] H5 test (`sgdm`) — DONE at lr=1e-3: falsified in simple form (sweep pending to rule
       out mistuned-SGD)
-- [ ] LR fairness sweep (~2.5 h): `t4_lr_sweep` ready — kills the mistuned-baseline
-      objection and settles tuned-SGD vs H5
+- [x] LR fairness sweep — DONE: gap survives symmetric tuning (+2.68/+2.75 best-vs-best);
+      H8 lr-window shift confirmed (AdamW/bnb peak at 3e-4 and collapse at 3e-3; SMO peaks
+      at 3e-3); SGD-M dead at every grid point
+- [ ] **Tuned star run** (decisive): 10 epochs × 3 seeds with per-optimizer best lrs
+      (adamw/bnb @ 3e-4, smo/smo8bit @ 3e-3) — revalidates the +13 headline under fair
+      tuning. Two invocations per seed (benchmark takes a single --lr):
+      `--lr 0.0003 --optimizers adamw,bnb8bit --tag tuned_lo_s{seed}` and
+      `--lr 0.003 --optimizers smo,smo8bit --tag tuned_hi_s{seed}` (~100 min total)
 - [ ] H4: add 2 extra seeds to the permute ablation (8 min each)
-- [ ] CharGPT k=0.5 + protect_output combined
-- [ ] CharGPT comparisons at ≥3 fresh seeds (currently single-seed)
+- [ ] Optional: finer lr grid around optima ({6e-4, 6e-3}) for H8 curve shapes; CharGPT
+      k=0.5 + protect_output combined; CharGPT ≥3 fresh seeds
 - [ ] Port row-banded update to SMO-Spatial (same transient bottleneck there:
       stacked pooling input + resident full-size reconstruction buffers)
