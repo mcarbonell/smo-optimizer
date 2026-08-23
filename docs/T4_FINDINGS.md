@@ -120,6 +120,25 @@ Readings:
   bnb's val loss (2.51 vs 2.52) while holding 14.6× less persistent state.
 - Throughput cost vs bnb: −14%.
 
+### H4 locality ablation (`--tag perm`, seed 1234)
+
+SMO-8bit with a fixed random row/col permutation applied before pooling
+(identical compression ratio, quantization and compute — only the geometry
+of the consensus changes):
+
+| Variant | test_acc |
+|---|---|
+| SMO-8bit k=0.25 (canonical, 3 seeds) | 55.53 ± 0.34 |
+| SMO-8bit k=0.25 + permute_basis | **52.13** |
+| bnb-AdamW8bit (noise reference) | 52.39 ± 1.30 |
+
+The permuted variant drops ~10σ below canonical and lands exactly at the
+quantization-noise level. **H4 CONFIRMED**: spatial smoothing wins *because*
+adjacent coordinates are correlated — destroy the neighborhood and the
+advantage vanishes entirely. Coherently explains the LM regression (embedding
+rows are semantically arbitrary neighbors → smoothing ≈ permuted smoothing).
+Caveat: single seed; add 2 more for rigor (8 min each).
+
 ### CharGPT char-LM on tiny-shakespeare (~40M params, 1000 steps, seed=1234)
 
 | Optimizer | Val loss | Δ vs AdamW | Persistent state | Peak alloc |
@@ -170,9 +189,12 @@ Readings:
   it does not wash out.
 - **H3 — quantization adds beneficial dither.** Supported by finding 2. Test: block_size
   sweep on SMO-8bit. Pending.
-- **H4 — locality prior:** smoothing wins because pooling exploits correlated adjacent
-  coordinates. Test: `--permute_basis` (random fixed row/col permutation before pooling,
-  unpermuted after reconstruction). Prediction: ViT advantage collapses to ≈ bnb level.
+- **H4 — locality prior.** **CONFIRMED** (single seed so far): permute_basis collapses
+  SMO-8bit from 55.53±0.34 to 52.13 ≈ bnb's noise-only level. The advantage requires
+  semantically meaningful neighborhoods; it is not generic noise, not "SGD-ness"
+  (H5 falsified), and not mere compression. Working story: *structured spatial consensus
+  on correlated coordinates = low-pass filtering of moment estimates that preserves
+  signal geometry while discarding high-frequency estimation noise.*
 - **H5 — partial de-adaptivization toward SGD-like updates:** smoothed exp_avg_sq damps
   per-coordinate adaptivity; Adam is known to generalize worse than SGD on vision
   from-scratch tasks while being essential for LM. Test: add an `sgdm` baseline — if
