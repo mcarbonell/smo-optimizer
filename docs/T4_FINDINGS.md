@@ -96,6 +96,30 @@ Key observations:
 - Effect size vs seed noise: Δ=+13.15 with σ_SMO8bit=0.14, σ_AdamW=1.23 → SE(diff)≈0.73 →
   z≈18. Beyond any reasonable doubt at this scale/config.
 
+### Killer demo (`--tag big2`, ~700M CharGPT, T4 16 GB) — ENGINEERING CLAIM CLOSED
+
+Config: d_model=1280, layers=36, block_size=256, batch=8, 200 steps, amp, seed=1234.
+
+| Optimizer | Status | Peak alloc | Persistent state | val_loss @200 |
+|---|---|---|---|---|
+| AdamW-fp32 | **OOM** | — | — | — |
+| SGD-M | ok | 13,416 MB | 2,703.9 MB | 3.22 |
+| bnb-AdamW8bit | ok | 12,035 MB | 1,375.4 MB | 2.52 |
+| SMO-Spatial (monolithic) | **OOM** | — | — | — |
+| **SMO-8bit low_peak** | **ok** | **10,728 MB** | **94.3 MB** | **2.51** |
+
+Readings:
+
+- AdamW cannot fit (~16 B/param incl. state); SMO-8bit trains comfortably (~9 B/param
+  step peak + activations) — the "trains where Adam cannot" headline is demonstrated.
+- Direct A/B for the low_peak fix: monolithic SMO variants OOM, banded SMO-8bit survives
+  with the *lowest* peak of all survivors (−11% vs bnb, −20% vs SGD-M).
+- State accounting sanity: 94.3 MB ≈ 707M params × k² × 2 int8 states + scales — matches
+  theory; bnb 1,375 MB ≈ 707M × 2 B; SGD-M 2,704 MB = momentum fp32.
+- Quality at 200 steps is only "it trains" (char-LM smoke budget), but SMO-8bit tracks
+  bnb's val loss (2.51 vs 2.52) while holding 14.6× less persistent state.
+- Throughput cost vs bnb: −14%.
+
 ### CharGPT char-LM on tiny-shakespeare (~40M params, 1000 steps, seed=1234)
 
 | Optimizer | Val loss | Δ vs AdamW | Persistent state | Peak alloc |
@@ -167,14 +191,15 @@ Key observations:
 
 ## Pending experiments
 
-- [ ] Killer demo, attempt 2 (needs `low_peak`, landed): e.g.
-      `--d_model 1280 --layers 36 --block_size 256 --batch 8 --steps 200 --amp --low_peak`
-      (~700M params: AdamW ≈ 14 GB static + activations → OOM; SMO-8bit lp ≈ 6.5 GB)
-- [ ] ViT long-run (10 epochs × 3 seeds) — RUNNING; early epochs show growing advantage (see H2)
+- [x] Killer demo, attempt 2 — **DONE** (`big2`): AdamW OOM; SMO-8bit lp trains with the
+      lowest peak of all survivors (10.7 GB) and 94 MB state. Engineering claim closed.
+- [x] ViT long-run (10 epochs × 3 seeds) — DONE: gap +13.15±0.14, H2 refuted
+- [x] H5 test (`sgdm`) — DONE at lr=1e-3: falsified in simple form (sweep pending to rule
+      out mistuned-SGD)
+- [ ] LR fairness sweep (~2.5 h): `t4_lr_sweep` ready — kills the mistuned-baseline
+      objection and settles tuned-SGD vs H5
+- [ ] H4: `--permute_basis` ablation (~8 min) — locality vs dynamics discriminator
 - [ ] CharGPT k=0.5 + protect_output combined
 - [ ] CharGPT comparisons at ≥3 fresh seeds (currently single-seed)
 - [ ] Port row-banded update to SMO-Spatial (same transient bottleneck there:
       stacked pooling input + resident full-size reconstruction buffers)
-- [ ] H5 test: `sgdm` baseline on ViT (`--optimizers adamw,sgdm,smo,smo8bit`), incl. an lr
-      sweep for SGD-M (1e-2…5e-2) since the cosine schedule is tuned for Adam-scale lr
-- [ ] H4 test: `--permute_basis` on ViT (`--optimizers smo,smo8bit --permute_basis`)
