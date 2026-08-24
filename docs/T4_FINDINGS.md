@@ -216,24 +216,29 @@ Readings:
    short-budget regimes — but tuned bitsandbytes-8bit currently leads long-budget
    vision quality."*
 
-### Convergence budget (30 epochs, seed 1234) — near-parity with bnb
+### Convergence budget (30 epochs, tuned, multi-seed) — FINAL CAMPAIGN TABLE
 
-| Optimizer | config | test acc | trajectory end-state |
-|---|---|---|---|
-| bnb-AdamW8bit | lr 3e-4 | **79.22** | plateaued (±0.2 last 5 ep) |
-| SMO k=0.25 | lr 1.5e-3 | 78.64 | plateaued |
-| AdamW-fp32 | lr 6e-4 | 72.54 | plateaued |
+| Optimizer | config | acc (mean±std) | Δ vs bnb | Persistent state |
+|---|---|---|---|---|
+| bnb-AdamW8bit | lr 3e-4 | **80.13 ± 0.79** (n=3) | — | 27.85 MB |
+| SMO k=0.25 | lr 1.5e-3 | 78.78 ± 0.28 (n=3) | −1.35 | 7.43 MB |
+| SMO-8bit k=0.25 | lr 1.5e-3 | ~78.40 (n=2; s1234 bundle stranded in old session, expect ~78.3) | −1.73 | **2.47 MB** |
+| AdamW-fp32 | lr 6e-4 | 72.54 (n=1; 2 seeds queued) | −7.59 | 108.68 MB |
 
 Readings:
 
-- SMO's true 10ep-optimal search carried to 30ep: **1.5e-3 beats 2e-3**
-  (78.64 vs 75.28) — peak located between 1e-3 and 3e-3 as suspected.
-- Tuned bnb vs tuned SMO: **−0.58, single seed** — within likely seed noise;
-  multi-seed required before calling it either way.
-- Both compression approaches dominate fp32 AdamW by ~6 points at this budget.
-- If parity holds across seeds: *"bnb-class quality with 11× less persistent state
-  (2.47 vs 27.85 MB) and the lowest step-time peak"* becomes the load-bearing claim,
-  alongside the short-budget win and the mechanism study.
+- **Tuned bnb leads convergence-budget quality by ~1.4–1.7 pts** over the SMO family —
+  a small, probably-real gap (≥2σ for SMO's tight σ=0.28).
+- **SMO at its true lr is extraordinarily stable**: σ=0.28 across seeds (bnb 0.79).
+  Third independent observation of variance collapse under moment smoothing.
+- The complete campaign picture across budgets (all best-tuned):
+  - 3 epochs: SMO #1 (+2.6 over AdamW/bnb)
+  - 10 epochs: bnb +2.2 over best SMO config
+  - 30 epochs: bnb +1.35/+1.73 over SMO/SMO-8bit
+  → bnb holds a slim long-budget edge; SMO wins short budgets and buys back the gap
+    with 11× less persistent state (SMO-8bit), the lowest step-time peak (low_peak),
+    and dramatically lower seed variance.
+- Both compressors dominate fp32 AdamW by ~6–7.6 pts at 30ep.
 
 ### CharGPT char-LM on tiny-shakespeare (~40M params, 1000 steps, seed=1234)
 
@@ -320,9 +325,8 @@ Readings:
 - [x] **Tuned star run** — DONE. Headline reversed: tuned bnb-8bit leads (70.65±0.63);
       SMO's best-known 10ep config remains @1e-3 (68.40±0.38). LR selection does not
       transfer across horizons (see star-run section). Memory/mechanism claims unaffected.
-- [ ] **30-epoch multi-seed** (running): smo@1.5e-3, bnb@3e-4 (decisive pair), plus
-      adamw@6e-4 and smo8bit@1.5e-3 — seeds 5678/9012 (~3 h total). Decides whether
-      the −0.58 gap to bnb at seed 1234 is noise or a real ordering.
+- [ ] **30ep table completion**: adamw@6e-4 seeds 5678/9012 (~45 min); recover or re-run
+      smo8bit@1.5e-3 s1234 (stranded bundle from old session, ~22 min)
 - [ ] H4: add 2 extra seeds to the permute ablation (8 min each)
 - [ ] Optional: sgdm@6e-2 bracket already done; finer grid polish deferred
 - [ ] Port row-banded update to SMO-Spatial (same transient bottleneck there:
