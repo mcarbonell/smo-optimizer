@@ -108,13 +108,17 @@ def analyze(args):
             value = metrics.get(mkey)
             if not isinstance(value, (int, float)):
                 continue
-            # Horizon matters: LRs selected at N epochs do not transfer to M
+            # Horizon matters: LRs selected at N epochs do not transfer to M.
+            # k_ratio also matters: k=0.25 and k=0.5 are different optimizers.
             if run.get("epochs"):
                 horizon = f"{run['epochs']}ep"
             elif run.get("steps"):
                 horizon = f"{run['steps']}st"
             else:
                 horizon = "?"
+            kr = run.get("k_ratio")
+            if kr is not None:
+                horizon += f"/k{kr:g}"
             groups[(family_of(run["variant"]), float(lr), horizon)].append(value)
 
     if not groups:

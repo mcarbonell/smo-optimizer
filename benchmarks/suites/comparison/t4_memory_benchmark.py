@@ -52,7 +52,7 @@ import torch.nn.functional as F
 
 from benchmarks._paths import DATA_DIR
 from benchmarks.results_utils import make_run_record, write_benchmark_bundle
-from smo import SMO, SMO8bit
+from smo import SMO, SMO8bit, SMOWalshPure, SMODCTPure
 
 try:
     import bitsandbytes as bnb
@@ -64,7 +64,7 @@ except ImportError:
 SHAKESPEARE_URL = (
     "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
 )
-OPTIMIZER_NAMES = ["adamw", "bnb8bit", "sgdm", "smo", "smo8bit"]
+OPTIMIZER_NAMES = ["adamw", "bnb8bit", "sgdm", "smo", "smo8bit", "walsh_pure", "dct_pure"]
 
 
 def set_seed(seed: int):
@@ -95,6 +95,9 @@ def make_optimizer(name: str, model: nn.Module, lr: float, k_ratio: float, prote
         return bnb.optim.AdamW8bit(model.parameters(), lr=lr, betas=(0.9, 0.999))
     if name == "sgdm":
         return torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9)
+    if name in ("walsh_pure", "dct_pure"):
+        cls = SMOWalshPure if name == "walsh_pure" else SMODCTPure
+        return cls(model.parameters(), lr=lr, k_ratio=k_ratio)
     if name in ("smo", "smo8bit"):
         cls = SMO if name == "smo" else SMO8bit
         kwargs = {}
@@ -530,7 +533,8 @@ def main():
 
     for name in opt_names:
         labels = {"adamw": "AdamW-fp32", "bnb8bit": "bnb-AdamW8bit", "sgdm": f"SGD-M lr={args.lr}",
-                  "smo": f"SMO k={args.k_ratio}", "smo8bit": f"SMO-8bit k={args.k_ratio}"}
+                  "smo": f"SMO k={args.k_ratio}", "smo8bit": f"SMO-8bit k={args.k_ratio}",
+                  "walsh_pure": f"Walsh-Pure k={args.k_ratio}", "dct_pure": f"DCT-Pure k={args.k_ratio}"}
         label = labels[name]
         if name == "smo8bit" and args.low_peak:
             label += " lp"
