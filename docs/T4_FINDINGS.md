@@ -240,6 +240,31 @@ Readings:
     and dramatically lower seed variance.
 - Both compressors dominate fp32 AdamW by ~6–7.6 pts at 30ep.
 
+### k=0.5 capacity probe (30ep, seed 1234) — mechanism answered + matched-budget gem
+
+| Config | acc | Persistent state | Bytes/param |
+|---|---|---|---|
+| SMO k=0.5 @1e-3 | **79.88** | 27.68 MB | 2 B (fp32, ¼ res) |
+| SMO-8bit k=0.5 @1e-3 | 79.50 | 7.85 MB | 0.5 B |
+| SMO k=0.25 @1.5e-3 | 78.64 | 7.43 MB | 1 B |
+| bnb-AdamW8bit @3e-4 | 79.22 | 27.85 MB | 2 B (int8, full res) |
+
+Findings:
+
+1. **Mechanism closed**: doubling compressed-moment capacity erased the gap to bnb
+   (78.64→79.88). The k=0.25 deficit was mostly *information lost to compression*,
+   not the smoothing dynamics themselves.
+2. **Matched-state-budget comparison (unplanned)**: SMO k=0.5 and bnb both store
+   exactly 2 B/param. At equal persistent bytes: spatial consensus 79.88 vs
+   quantization 79.22 (**+0.66, single seed**). Where you compress matters more than
+   how much — pending multi-seed confirmation.
+3. LR shifts down with k (1e-3 optimal for k=0.5 vs 1.5e-3 for k=0.25): less
+   smoothing → smaller effective-step boost. Consistent with H8.
+4. SMO-8bit k=0.5 delivers 79.50 at HALF of bnb's state bytes (0.5 B/param).
+
+Caveats: all single-seed; k=0.5 multiseed queued. Session dropped mid-queue
+(spectral scouting + H4 extras still pending).
+
 ### CharGPT char-LM on tiny-shakespeare (~40M params, 1000 steps, seed=1234)
 
 | Optimizer | Val loss | Δ vs AdamW | Persistent state | Peak alloc |
