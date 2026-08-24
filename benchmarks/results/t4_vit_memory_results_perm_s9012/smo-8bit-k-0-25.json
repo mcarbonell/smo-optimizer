@@ -1,0 +1,61 @@
+{
+  "date": "2026-08-24T14:54:36+00:00",
+  "git_commit": "c7c3c9186e383ff198718c1de5e287e90e7f84e7",
+  "script_name": "benchmarks/suites/comparison/t4_memory_benchmark.py",
+  "benchmark_family": "gpu_memory_training",
+  "variant": "SMO-8bit k=0.25",
+  "hardware": "CUDA",
+  "backend": "cuda",
+  "framework_versions": {
+    "torch": "2.10.0+cu128",
+    "cuda": "12.8"
+  },
+  "dataset": "CIFAR-10",
+  "model": "TinyViT",
+  "seed": 9012,
+  "batch_size": null,
+  "precision": "fp16-autocast",
+  "epochs": 3,
+  "steps": null,
+  "metrics": {
+    "status": "ok",
+    "params": 14244490,
+    "coverage_pct": 99.38,
+    "persistent_state_mb": 2.84,
+    "final_test_acc": 52.26,
+    "images_per_s": 917,
+    "wall_s": 163.3,
+    "history": [
+      {
+        "epoch": 1,
+        "train_loss": 1.8255,
+        "test_acc": 41.97
+      },
+      {
+        "epoch": 2,
+        "train_loss": 1.5143,
+        "test_acc": 49.84
+      },
+      {
+        "epoch": 3,
+        "train_loss": 1.3752,
+        "test_acc": 52.26
+      }
+    ],
+    "_peak_alloc_mb": 1191.8,
+    "peak_reserved_mb": 1480.0
+  },
+  "workload": {
+    "width": 384,
+    "depth": 8,
+    "heads": 8,
+    "patch": 4,
+    "epochs": 3
+  },
+  "k_ratio": 0.25,
+  "metric_key": "final_test_acc",
+  "low_peak": false,
+  "protect_output": false,
+  "permute_basis": true,
+  "lr": 0.001
+}
