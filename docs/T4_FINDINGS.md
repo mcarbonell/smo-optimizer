@@ -216,6 +216,25 @@ Readings:
    short-budget regimes — but tuned bitsandbytes-8bit currently leads long-budget
    vision quality."*
 
+### Convergence budget (30 epochs, seed 1234) — near-parity with bnb
+
+| Optimizer | config | test acc | trajectory end-state |
+|---|---|---|---|
+| bnb-AdamW8bit | lr 3e-4 | **79.22** | plateaued (±0.2 last 5 ep) |
+| SMO k=0.25 | lr 1.5e-3 | 78.64 | plateaued |
+| AdamW-fp32 | lr 6e-4 | 72.54 | plateaued |
+
+Readings:
+
+- SMO's true 10ep-optimal search carried to 30ep: **1.5e-3 beats 2e-3**
+  (78.64 vs 75.28) — peak located between 1e-3 and 3e-3 as suspected.
+- Tuned bnb vs tuned SMO: **−0.58, single seed** — within likely seed noise;
+  multi-seed required before calling it either way.
+- Both compression approaches dominate fp32 AdamW by ~6 points at this budget.
+- If parity holds across seeds: *"bnb-class quality with 11× less persistent state
+  (2.47 vs 27.85 MB) and the lowest step-time peak"* becomes the load-bearing claim,
+  alongside the short-budget win and the mechanism study.
+
 ### CharGPT char-LM on tiny-shakespeare (~40M params, 1000 steps, seed=1234)
 
 | Optimizer | Val loss | Δ vs AdamW | Persistent state | Peak alloc |
@@ -301,11 +320,9 @@ Readings:
 - [x] **Tuned star run** — DONE. Headline reversed: tuned bnb-8bit leads (70.65±0.63);
       SMO's best-known 10ep config remains @1e-3 (68.40±0.38). LR selection does not
       transfer across horizons (see star-run section). Memory/mechanism claims unaffected.
-- [ ] **SMO 10ep lr refinement**: probe {1.5e-3, 2e-3} × seed 1234 (~8 min each) — its
-      10ep-optimal lr was never measured; the 3e-3 choice came from a 3ep proxy that
-      demonstrably fails to transfer
-- [ ] **bnb anomaly investigation**: why does tuned bnb-8bit beat fp32 AdamW by +5?
-      Reproduce on CIFAR-100 / another architecture before believing it
+- [ ] **30-epoch multi-seed** (running): smo@1.5e-3, bnb@3e-4 (decisive pair), plus
+      adamw@6e-4 and smo8bit@1.5e-3 — seeds 5678/9012 (~3 h total). Decides whether
+      the −0.58 gap to bnb at seed 1234 is noise or a real ordering.
 - [ ] H4: add 2 extra seeds to the permute ablation (8 min each)
 - [ ] Optional: sgdm@6e-2 bracket already done; finer grid polish deferred
 - [ ] Port row-banded update to SMO-Spatial (same transient bottleneck there:
