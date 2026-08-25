@@ -1,6 +1,6 @@
 {
-  "date": "2026-08-25T13:46:24+00:00",
-  "git_commit": "66b9d2b56ede678fa16c0a15047efab07b279c5a",
+  "date": "2026-08-25T16:28:57+00:00",
+  "git_commit": "3c12e37a1bc83ff5ceadfe13b3c5b09fe22c2710",
   "script_name": "benchmarks/suites/training/benchmark_cifar10.py",
   "benchmark_family": "end_to_end_training",
   "variant": "Adam",
@@ -14,12 +14,12 @@
   "seed": 1234,
   "batch_size": 128,
   "precision": "fp32",
-  "epochs": 3,
+  "epochs": 10,
   "steps": null,
   "metrics": {
-    "final_accuracy": 62.2,
+    "final_accuracy": 72.9,
     "optimizer_state_mb": 4.74,
-    "total_time_s": 118.39
+    "total_time_s": 412.16
   },
   "raw_result": {
     "optimizer": "Standard Adam",
@@ -30,27 +30,76 @@
         "train_loss": 1.6564,
         "train_acc": 38.64,
         "test_acc": 52.11,
-        "time": 39.39
+        "time": 41.23
       },
       {
         "epoch": 2,
         "train_loss": 1.387,
         "train_acc": 49.36,
         "test_acc": 55.8,
-        "time": 39.24
+        "time": 40.42
       },
       {
         "epoch": 3,
         "train_loss": 1.2556,
         "train_acc": 54.41,
         "test_acc": 62.2,
-        "time": 39.76
+        "time": 40.65
+      },
+      {
+        "epoch": 4,
+        "train_loss": 1.1719,
+        "train_acc": 57.75,
+        "test_acc": 63.25,
+        "time": 40.69
+      },
+      {
+        "epoch": 5,
+        "train_loss": 1.1036,
+        "train_acc": 60.58,
+        "test_acc": 66.91,
+        "time": 41.4
+      },
+      {
+        "epoch": 6,
+        "train_loss": 1.0574,
+        "train_acc": 62.34,
+        "test_acc": 68.58,
+        "time": 41.29
+      },
+      {
+        "epoch": 7,
+        "train_loss": 1.0141,
+        "train_acc": 64.38,
+        "test_acc": 70.51,
+        "time": 41.36
+      },
+      {
+        "epoch": 8,
+        "train_loss": 0.9854,
+        "train_acc": 65.16,
+        "test_acc": 71.19,
+        "time": 41.27
+      },
+      {
+        "epoch": 9,
+        "train_loss": 0.9527,
+        "train_acc": 66.25,
+        "test_acc": 68.86,
+        "time": 41.85
+      },
+      {
+        "epoch": 10,
+        "train_loss": 0.933,
+        "train_acc": 67.09,
+        "test_acc": 72.9,
+        "time": 42.0
       }
     ],
     "train_time": 0,
     "seed": 1234,
-    "total_time": 118.39,
+    "total_time": 412.16,
     "optimizer_memory_mb": 4.74,
-    "final_test_acc": 62.2
+    "final_test_acc": 72.9
   }
 }
