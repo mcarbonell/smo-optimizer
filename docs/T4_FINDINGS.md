@@ -221,16 +221,16 @@ Readings:
 
 | Optimizer | config | acc (mean±std) | Δ vs bnb | Persistent state |
 |---|---|---|---|---|
-| **SMO k=0.5** | lr 1e-3 | **80.29 ± 0.55**† (n=3) | **+0.16** | 27.68 MB |
+| **SMO k=0.5** | lr 1e-3 | **80.29 ± 0.55** (n=3) | **+0.16** | 27.68 MB |
 | bnb-AdamW8bit | lr 3e-4 | 80.13 ± 0.79 (n=3) | — | 27.85 MB |
 | SMO-8bit k=0.5 | lr 1e-3 | 79.71 ± 0.39† (n=3) | −0.42 | **7.85 MB** |
 | SMO k=0.25 | lr 1.5e-3 | 78.78 ± 0.28 (n=3) | −1.35 | 7.43 MB |
 | SMO-8bit k=0.25 | lr 1.5e-3 | 78.30 ± 0.53 (n=3) | −1.83 | **2.47 MB** |
 | AdamW-fp32 | lr 6e-4 | 73.39 ± 0.77 (n=3) | −6.74 | 108.68 MB |
 
-\† s1234 values (79.88 / 79.50) come from the original probe session whose JSON
-bundles were lost; they are cross-session reproducible (see k=0.5 section) and
-their regeneration into `benchmarks/results/` is queued.
+\† SMO-8bit's s1234 value (79.50) still rests on the lost probe-session bundle
+(SMO's s1234 was regenerated in session 5 and reproduces 79.88 exactly); its
+regeneration into `benchmarks/results/` is queued.
 
 Readings:
 
@@ -284,12 +284,13 @@ Findings:
 4. LR shifts down with k (1e-3 for k=0.5 vs 1.5e-3 for k=0.25): less smoothing →
    smaller effective-step boost. Consistent with H8.
 5. Determinism note: the probe's s1234 runs were re-executed in an independent
-   later session and reproduced exactly (79.88 / 79.50 both times). Both sessions'
-   JSON bundles were lost before commit — only the s5678/s9012 bundles from
-   session 4 are versioned.
+   later session and reproduced exactly (79.88 / 79.50 both times). Those sessions'
+   JSON bundles were lost before commit; SMO's s1234 bundle has since been
+   regenerated from a third session (session 5) and matched 79.88 bit-exactly —
+   only SMO-8bit's s1234 bundle remains unversioned.
 
-Caveats: s1234 bundles pending regeneration into `benchmarks/results/`; the k=0.5
-lr grid is a single point at this horizon (see final-table caveat).
+Caveats: smo8bit s1234 bundle pending regeneration into `benchmarks/results/`;
+the k=0.5 lr grid is a single point at this horizon (see final-table caveat).
 
 ### CharGPT char-LM on tiny-shakespeare (~40M params, 1000 steps, seed=1234)
 
@@ -380,8 +381,10 @@ lr grid is a single point at this horizon (see final-table caveat).
       n=3 (78.30±0.53, s1234 recovered)
 - [x] **k=0.5 multiseed** — DONE (session 4): SMO k=0.5 80.29±0.55; SMO-8bit k=0.5
       79.71±0.39. Statistical tie with bnb at matched state bytes (see k=0.5 section)
-- [ ] Regenerate lost s1234 JSON bundles for k=0.5 @1e-3 (~50 min GPU): values are
-      known and cross-session reproducible (79.88 / 79.50) but no bundle is versioned
+- [x] Regenerate lost s1234 bundle, SMO k=0.5 @1e-3 — DONE (session 5): reproduces
+      79.88 exactly; row now fully versioned (n=3)
+- [ ] Regenerate lost s1234 JSON bundle, SMO-8bit k=0.5 @1e-3 (~26 min GPU): value
+      known and cross-session reproducible (79.50) but no bundle is versioned
 - [ ] H4: add 2 extra seeds to the permute ablation (8 min each)
 - [ ] Optional: sgdm@6e-2 bracket already done; finer grid polish deferred
 - [ ] Port row-banded update to SMO-Spatial (same transient bottleneck there:

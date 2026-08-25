@@ -26,6 +26,10 @@ Local smoke:
 Resume-friendly: combos whose bundle already exists are skipped unless
 --force. Use --analyze_only to rebuild the report without launching.
 Unknown extra flags are forwarded verbatim to t4_memory_benchmark.
+
+Use --horizon (e.g. '--horizon 30ep') to restrict the report to runs whose
+@horizon starts with the given prefix — silences stale rows from other
+training lengths instead of mixing them into the same family table.
 """
 
 import argparse
@@ -119,6 +123,8 @@ def analyze(args):
             kr = run.get("k_ratio")
             if kr is not None:
                 horizon += f"/k{kr:g}"
+            if args.horizon and not horizon.startswith(args.horizon):
+                continue
             groups[(family_of(run["variant"]), float(lr), horizon)].append(value)
 
     if not groups:
@@ -181,6 +187,8 @@ def main():
     parser.add_argument("--lrs", default="", help="comma-separated learning rates")
     parser.add_argument("--seeds", default="1234", help="comma-separated seeds")
     parser.add_argument("--analyze_only", action="store_true")
+    parser.add_argument("--horizon", default="",
+                        help="analyze only runs whose @horizon starts with this prefix (e.g. '30ep')")
     parser.add_argument("--force", action="store_true", help="re-run even if bundle exists")
     parser.add_argument("--out", default=None, help="markdown filename inside results dir")
     args, passthrough = parser.parse_known_args()

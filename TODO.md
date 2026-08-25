@@ -1,11 +1,20 @@
 # TODO.md - ROADMAP Progress Tracker
 
-## Current Status (2026-08-23)
+## Current Status (2026-08-24)
 
-- 🔬 **T4 GPU campaign (Kaggle)** — see `docs/T4_FINDINGS.md`
-   - **Multi-seed result: SMO/SMO-8bit beat AdamW AND bnb-8bit by +2.6/+2.8 acc on TinyViT/CIFAR-10** (55.5±0.3 vs 52.7±0.6), with 93–98% less persistent state
-   - CharGPT: compression hurts LM quality (+0.21…0.49 val loss); `--protect_output` hypothesis pending
-   - Peak-memory during training only improves for SMO-8bit; SMO-Spatial peak exceeds AdamW (resident buffers)
+- 🔬 **T4 GPU campaign (Kaggle/Colab)** — see `docs/T4_FINDINGS.md`
+   - **30ep convergence budget (n=3): SMO k=0.5 ties bnb-8bit at matched persistent
+     bytes** (80.29±0.55 vs 80.13±0.79); SMO-8bit k=0.5 −0.42 with 28% of bnb's bytes.
+     The earlier "+13 over AdamW" headline was reversed by the fairness protocol
+     (autopsy in findings doc) — memory/mechanism claims unaffected
+   - Mechanism closed: locality-dependent spatial consensus on moments; the k=0.25
+     long-budget gap was compression capacity, not the smoothing dynamics
+   - CharGPT: compression hurts LM quality (+0.21…0.49 val loss); `protect_output`
+     recovers ~⅓ (confirmed)
+   - Peak-memory during training only improves for SMO-8bit (`low_peak`); SMO-Spatial
+     peak exceeds AdamW (resident buffers)
+   - Queue: smo8bit k=0.5 s1234 bundle regen (~26 min GPU), H4 permute ×2 seeds,
+     k=0.5 lr bracket @30ep
 - ✅ **Phase 2: Correctness & Measurement** — COMPLETE (2026-05-06)
    - Baselines completos: MNIST, CIFAR-10, MiniGPT, Spectral (Walsh/DCT)
    - Memory savings: 63–93% según variant y tarea

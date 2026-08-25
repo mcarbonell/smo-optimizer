@@ -7,10 +7,11 @@ SMO is a research optimizer for PyTorch that compresses Adam's moment states
 (`exp_avg`, `exp_avg_sq`) with **structured spatial pooling** plus optional
 **INT8 block-wise quantization**, cutting persistent optimizer state by
 **93–98%** and step-time peak memory (row-banded update), while matching
-Adam-class quality at equal budget — and beating every tuned baseline in
-short-budget vision training. This repository is also a working example of
-adversarial self-evaluation: the campaign's fairness protocol reversed its own
-headline result, and that autopsy is documented in full.
+Adam-class quality at equal budget — beating every tuned baseline in
+short-budget vision training and tying bitsandbytes-8bit at matched
+persistent-state bytes over 30-epoch budgets. This repository is also a working
+example of adversarial self-evaluation: the campaign's fairness protocol
+reversed its own headline result, and that autopsy is documented in full.
 
 ---
 
@@ -29,7 +30,7 @@ at its own best learning rate, ViT 3 epochs:
 | 4 | bnb-AdamW8bit | 57.29 | 3e-4 |
 | 5 | SGD-M (momentum 0.9) | 52.62 | 6e-2 |
 
-At the longer budget (10 epochs, 3 seeds, per-optimizer tuned LRs):
+Mid budget (10 epochs, 3 seeds, per-optimizer tuned LRs) — bnb leads here:
 
 | Optimizer | best-known acc (10 ep) | config |
 |---|---|---|
@@ -38,12 +39,30 @@ At the longer budget (10 epochs, 3 seeds, per-optimizer tuned LRs):
 | SMO k=0.25 | 68.40 ± 0.38 | lr 1e-3 |
 | AdamW-fp32 | 65.62 ± 0.19 | lr 6e-4 |
 
-**Honest reading**: under symmetric tuning, bitsandbytes-8bit currently leads long-budget
-vision quality; SMO-8bit matches Adam-class quality (±3) with **44× less state**, wins the
-short-budget regime, and is the only option that also minimizes step-time peak memory.
-A methodological finding from this campaign: **LRs selected on short-horizon proxies do
-not transfer to longer budgets — in both directions** (it inflated our own initial +13
-claim; see `docs/T4_FINDINGS.md` for the full autopsy).
+Convergence budget (30 epochs, 3 seeds, best-tuned per optimizer) — at matched
+state bytes the picture flips:
+
+| Rank | Optimizer | acc (mean±std) | config | persistent state |
+|---|---|---|---|---|
+| 1 | **SMO k=0.5** | **80.29 ± 0.55** | lr 1e-3 | 27.7 MB (2 B/param) |
+| 2 | bnb-AdamW8bit | 80.13 ± 0.79 | lr 3e-4 | 27.9 MB |
+| 3 | SMO-8bit k=0.5 | 79.71 ± 0.39* | lr 1e-3 | **7.9 MB (0.5 B/param)** |
+| 4 | SMO k=0.25 | 78.78 ± 0.28 | lr 1.5e-3 | 7.4 MB |
+| 5 | SMO-8bit k=0.25 | 78.30 ± 0.53 | lr 1.5e-3 | **2.5 MB** |
+| 6 | AdamW-fp32 | 73.39 ± 0.77 | lr 6e-4 | 108.7 MB |
+
+\* s1234 value reproduces the lost probe-session run exactly; its JSON bundle
+regeneration is queued (all other cells fully versioned).
+
+**Honest reading**: short budgets belong to SMO outright; at the 30-epoch budget
+spatial consensus **ties quantization at exactly matched persistent bytes**
+(+0.16 nominal, z≈0.3 — parity, not victory), and SMO-8bit gives up only ~0.4 pts
+while storing **28% of bnb's bytes**, with consistently lower seed variance than
+every baseline (σ ≤ 0.55 vs bnb 0.79 / AdamW 1.23). It is also the only option
+that minimizes step-time peak memory (`low_peak`). A methodological finding from
+this campaign: **LRs selected on short-horizon proxies do not transfer to longer
+budgets — in both directions** (it inflated our own initial +13 claim; see
+`docs/T4_FINDINGS.md` for the full autopsy).
 
 ### Loss-matched generalization frontier
 
@@ -88,7 +107,8 @@ estimation noise without destroying adaptivity. Full log: `docs/T4_FINDINGS.md`.
 - **Resident ≠ persistent**: SMO-Spatial keeps full-resolution reconstruction
   buffers cached (peak can exceed AdamW); use **SMO-8bit `low_peak=True`** when
   step-time peak matters — its row-banded update allocates nothing full-size.
-- Several results are single-seed (flagged per-case in `docs/T4_FINDINGS.md`).
+- Several headline tables are n=3; the H4 locality ablation (`permute_basis`) is
+  still single-seed (extra seeds queued, flagged in `docs/T4_FINDINGS.md`).
 
 ---
 

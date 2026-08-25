@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **30-epoch convergence-budget table, multi-seed** (`docs/T4_FINDINGS.md`):
+  SMO k=0.5 ties bnb-AdamW8bit at matched persistent bytes (80.29±0.55 vs
+  80.13±0.79, z≈0.3); SMO-8bit k=0.5 −0.42 with 28% of bnb's state bytes;
+  adamw@6e-4 completed to n=3 (73.39±0.77); smo8bit@1.5e-3 n=3 (78.30±0.53).
+  Mechanism reading: the k=0.25 long-budget gap was compression capacity,
+  not smoothing dynamics
+- `t4_lr_sweep --horizon PREFIX`: restrict analysis/report to runs whose
+  @horizon starts with the prefix (silences stale rows from other lengths)
 - **T4 GPU campaign tooling** (`benchmarks/suites/comparison/`):
   - `t4_memory_benchmark.py` — peak-memory + quality comparison vs AdamW/bnb-8bit/SGD-M;
     OOM-tolerant per optimizer; trajectory logging; per-group `compress` opt-out;
