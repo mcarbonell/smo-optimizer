@@ -139,50 +139,73 @@ class SMO8bit(Optimizer):
                 state = self.state[p]
                 k_ratio = group['k_ratio']
                 block_size = group['block_size']
-                # Per-param-group opt-out: {"compress": False} forces dense Adam moments
-                use_compression = group.get('compress', True)
+                # Per-param-group compression contract:
+                #   {"compress": True}          -> spatial pooling + int8 (eligible shapes)
+                #   {"compress": False}         -> dense fp32 Adam moments
+                #   {"compress": "quant_only"}  -> FULL-resolution int8 moments, no spatial
+                #                                  pooling. For tensors whose rows have
+                #                                  arbitrary neighbors (embedding tables,
+                #                                  tied heads): quantization keeps the
+                #                                  memory win without mixing tokens.
+                raw_compress = group.get('compress', True)
+                use_compression = bool(raw_compress)
+                quant_only = (raw_compress == "quant_only")
 
                 # Initialization
                 if len(state) == 0:
                     state['step'] = 0
-                    view = compression_view(grad.shape, include_conv=self.compress_conv) if use_compression else None
-                    if view is not None and p.is_contiguous():
-                        view_shape, param_shape = view
-                        state['is_compressed'] = True
-                        # orig_shape is the pooled ROW VIEW the math runs in;
-                        # param_shape is the tensor's real shape (e.g. conv 4D).
-                        state['orig_shape'] = view_shape
-                        state['param_shape'] = param_shape
-                        new_h = max(1, int(view_shape[0] * k_ratio))
-                        new_w = max(1, int(view_shape[1] * k_ratio))
-                        comp_shape = (new_h, new_w)
-                        state['comp_numel'] = new_h * new_w
-                        # Quantization blocks must not mix rows of the compact
-                        # tensor: conv output channels can differ by orders of
-                        # magnitude in moment scale, and a shared int8 scale
-                        # crushes low-magnitude rows -> underestimated second
-                        # moments -> oversized steps -> divergence (observed as
-                        # NaN losses on CNNs with block_size=64). Linear
-                        # matrices keep the historical flattened-block layout
-                        # for campaign comparability; conv-view (4D) params
-                        # quantize one full row per block.
-                        state['q_block'] = min(block_size, new_w) if len(param_shape) == 4 else block_size
-
-                        # Initialize states as quantized
-                        dummy = torch.zeros(comp_shape, dtype=grad.dtype, device=grad.device)
-                        m_q, m_s, _ = self._quantize_blockwise(dummy, state['q_block'])
-                        v_q, v_s, _ = self._quantize_blockwise(dummy, state['q_block'])
-
-                        state['m_q'], state['m_s'] = m_q, m_s
-                        state['v_q'], state['v_s'] = v_q, v_s
-                        state['comp_shape'] = comp_shape
-                        if self.permute_basis:
-                            state['row_perm'] = torch.randperm(view_shape[0], device=grad.device)
-                            state['col_perm'] = torch.randperm(view_shape[1], device=grad.device)
-                    else:
+                    if quant_only:
+                        state['is_quant_only'] = True
                         state['is_compressed'] = False
-                        state['exp_avg'] = torch.zeros_like(p, memory_format=torch.preserve_format)
-                        state['exp_avg_sq'] = torch.zeros_like(p, memory_format=torch.preserve_format)
+                        state['q_shape'] = tuple(grad.shape)
+                        state['q_numel'] = grad.numel()
+                        # Matrix-like tensors get one int8 scale per row:
+                        # token rows differ in scale (same dead-zone lesson
+                        # as the conv row-aligned policy).
+                        tail = grad.shape[-1] if grad.dim() >= 2 else max(1, grad.numel())
+                        state['q_block'] = min(block_size, tail) if grad.dim() >= 2 else block_size
+                        dummy = torch.zeros(tuple(grad.shape), dtype=grad.dtype, device=grad.device)
+                        state['m_q'], state['m_s'], _ = self._quantize_blockwise(dummy, state['q_block'])
+                        state['v_q'], state['v_s'], _ = self._quantize_blockwise(dummy, state['q_block'])
+                    else:
+                        view = compression_view(grad.shape, include_conv=self.compress_conv) if use_compression else None
+                        if view is not None and p.is_contiguous():
+                            view_shape, param_shape = view
+                            state['is_compressed'] = True
+                            # orig_shape is the pooled ROW VIEW the math runs in;
+                            # param_shape is the tensor's real shape (e.g. conv 4D).
+                            state['orig_shape'] = view_shape
+                            state['param_shape'] = param_shape
+                            new_h = max(1, int(view_shape[0] * k_ratio))
+                            new_w = max(1, int(view_shape[1] * k_ratio))
+                            comp_shape = (new_h, new_w)
+                            state['comp_numel'] = new_h * new_w
+                            # Quantization blocks must not mix rows of the compact
+                            # tensor: conv output channels can differ by orders of
+                            # magnitude in moment scale, and a shared int8 scale
+                            # crushes low-magnitude rows -> underestimated second
+                            # moments -> oversized steps -> divergence (observed as
+                            # NaN losses on CNNs with block_size=64). Linear
+                            # matrices keep the historical flattened-block layout
+                            # for campaign comparability; conv-view (4D) params
+                            # quantize one full row per block.
+                            state['q_block'] = min(block_size, new_w) if len(param_shape) == 4 else block_size
+
+                            # Initialize states as quantized
+                            dummy = torch.zeros(comp_shape, dtype=grad.dtype, device=grad.device)
+                            m_q, m_s, _ = self._quantize_blockwise(dummy, state['q_block'])
+                            v_q, v_s, _ = self._quantize_blockwise(dummy, state['q_block'])
+
+                            state['m_q'], state['m_s'] = m_q, m_s
+                            state['v_q'], state['v_s'] = v_q, v_s
+                            state['comp_shape'] = comp_shape
+                            if self.permute_basis:
+                                state['row_perm'] = torch.randperm(view_shape[0], device=grad.device)
+                                state['col_perm'] = torch.randperm(view_shape[1], device=grad.device)
+                        else:
+                            state['is_compressed'] = False
+                            state['exp_avg'] = torch.zeros_like(p, memory_format=torch.preserve_format)
+                            state['exp_avg_sq'] = torch.zeros_like(p, memory_format=torch.preserve_format)
 
                 beta1, beta2 = group['betas']
                 state['step'] += 1
@@ -237,6 +260,21 @@ class SMO8bit(Optimizer):
 
                     # 6. Free temporary float32 tensors immediately to avoid VRAM spikes
                     del m, v
+                elif state.get('is_quant_only'):
+                    # Full-resolution int8 moments: no spatial pooling, so
+                    # coordinates with arbitrary neighborhoods (embedding
+                    # rows, tied heads) are never mixed. Memory cost is the
+                    # quantized storage only (~1 B/param for m+v at fp32
+                    # moments), not AdamW's 8 B/param.
+                    m = self._dequantize_blockwise(state['m_q'], state['m_s'], state['q_shape'], state['q_numel'], dtype=grad.dtype)
+                    v = self._dequantize_blockwise(state['v_q'], state['v_s'], state['q_shape'], state['q_numel'], dtype=grad.dtype)
+                    m.mul_(beta1).add_(grad, alpha=1 - beta1)
+                    v.mul_(beta2).addcmul_(grad, grad, value=1 - beta2)
+                    # Keep the fp32 copies: they ARE the reconstruction used
+                    # by the update below (re-quantized for storage).
+                    state['m_q'], state['m_s'], _ = self._quantize_blockwise(m, state['q_block'])
+                    state['v_q'], state['v_s'], _ = self._quantize_blockwise(v, state['q_block'])
+                    m_rec, v_rec = m, v
                 else:
                     # Fallback for 1D/small tensors
                     state['exp_avg'].mul_(beta1).add_(grad, alpha=1 - beta1)

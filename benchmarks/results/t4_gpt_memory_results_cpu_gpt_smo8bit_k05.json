@@ -1,0 +1,119 @@
+{
+  "suite_name": "t4_gpu_memory_gpt_cpu_gpt_smo8bit_k05",
+  "benchmark_family": "gpu_memory_training",
+  "generated_at": "2026-08-25T22:44:02+00:00",
+  "git_commit": "50fa2c7315c33346418cffc7c12587f13f1f3794",
+  "host": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.14.2"
+  },
+  "summary": {
+    "suite": "gpt",
+    "workload": {
+      "d_model": 512,
+      "layers": 8,
+      "heads": 8,
+      "block_size": 256,
+      "batch": 32,
+      "steps": 1000
+    },
+    "amp": false,
+    "seed": 1234
+  },
+  "runs": [
+    {
+      "date": "2026-08-25T22:44:02+00:00",
+      "git_commit": "50fa2c7315c33346418cffc7c12587f13f1f3794",
+      "script_name": "benchmarks/suites/comparison/t4_memory_benchmark.py",
+      "benchmark_family": "gpu_memory_training",
+      "variant": "SMO-8bit k=0.5",
+      "hardware": "CPU",
+      "backend": "cpu",
+      "framework_versions": {
+        "torch": "2.10.0+cpu"
+      },
+      "dataset": "tiny-shakespeare",
+      "model": "CharGPT",
+      "seed": 1234,
+      "batch_size": null,
+      "precision": "fp32",
+      "epochs": null,
+      "steps": 1000,
+      "metrics": {
+        "status": "ok",
+        "params": 25384448,
+        "coverage_pct": 99.79,
+        "persistent_state_mb": 13.25,
+        "final_val_loss": 1.8024,
+        "tokens_per_s": 1131,
+        "wall_s": 7240.3,
+        "history": [
+          {
+            "step": 100,
+            "train_loss": 2.5147,
+            "val_loss": 2.539
+          },
+          {
+            "step": 200,
+            "train_loss": 2.5042,
+            "val_loss": 2.4589
+          },
+          {
+            "step": 300,
+            "train_loss": 2.3018,
+            "val_loss": 2.3159
+          },
+          {
+            "step": 400,
+            "train_loss": 2.1413,
+            "val_loss": 2.1448
+          },
+          {
+            "step": 500,
+            "train_loss": 1.9523,
+            "val_loss": 2.012
+          },
+          {
+            "step": 600,
+            "train_loss": 1.8501,
+            "val_loss": 1.9166
+          },
+          {
+            "step": 700,
+            "train_loss": 1.7713,
+            "val_loss": 1.8623
+          },
+          {
+            "step": 800,
+            "train_loss": 1.6798,
+            "val_loss": 1.8245
+          },
+          {
+            "step": 900,
+            "train_loss": 1.7239,
+            "val_loss": 1.8053
+          },
+          {
+            "step": 1000,
+            "train_loss": 1.7251,
+            "val_loss": 1.8024
+          }
+        ]
+      },
+      "workload": {
+        "d_model": 512,
+        "layers": 8,
+        "heads": 8,
+        "block_size": 256,
+        "batch": 32,
+        "steps": 1000
+      },
+      "k_ratio": 0.5,
+      "metric_key": "final_val_loss",
+      "low_peak": false,
+      "protect_output": false,
+      "permute_basis": false,
+      "lr": 0.001
+    }
+  ]
+}

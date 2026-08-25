@@ -98,6 +98,9 @@ class SMO(Optimizer):
                 k_ratio = group['k_ratio']
                 # Per-param-group opt-out: {"compress": False} forces dense Adam moments
                 use_compression = group.get('compress', True)
+                if use_compression == "quant_only":
+                    raise ValueError("SMO (fp32) has no int8 storage; 'quant_only'"
+                                     " groups require SMO8bit")
 
                 # Initialization
                 if len(state) == 0:

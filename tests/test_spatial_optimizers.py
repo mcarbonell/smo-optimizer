@@ -207,6 +207,73 @@ class ConvPoolingTests(unittest.TestCase):
         self.assertTrue(torch.allclose(state["exp_avg_sq"], expected, atol=1e-8, rtol=1e-5))
 
 
+class QuantOnlyGroupTests(unittest.TestCase):
+    """{"compress": "quant_only"}: full-resolution int8 moments, no pooling."""
+
+    def _make(self, param, block_size=64):
+        return SMO8bit([{"params": [param], "compress": "quant_only"}],
+                       lr=1e-3, betas=(0.9, 0.999), block_size=block_size)
+
+    def test_matches_dense_adam_when_quantization_is_exact(self):
+        torch.manual_seed(7)
+        p_q = torch.nn.Parameter(torch.randn(48, 32))
+        p_a = torch.nn.Parameter(p_q.detach().clone())
+        opt_q = self._make(p_q, block_size=1)
+        opt_a = torch.optim.Adam([p_a], lr=1e-3)
+
+        for _ in range(5):
+            g = torch.randn_like(p_q)
+            p_q.grad = g.clone()
+            p_a.grad = g.clone()
+            opt_q.step()
+            opt_a.step()
+
+        self.assertTrue(torch.allclose(p_q, p_a, atol=1e-6))
+
+    def test_state_is_full_resolution_and_small(self):
+        from benchmarks.suites.comparison.t4_memory_benchmark import persistent_state_mb
+
+        torch.manual_seed(3)
+        p = torch.nn.Parameter(torch.randn(64, 64))
+        opt = self._make(p)
+        p.grad = torch.randn_like(p)
+        opt.step()
+
+        st = opt.state[p]
+        self.assertTrue(st["is_quant_only"])
+        self.assertFalse(st["is_compressed"])
+        self.assertEqual(st["q_numel"], 64 * 64)
+
+        # quantized storage must stay well under dense fp32 moments (8 B/param)
+        p_dense = torch.nn.Parameter(torch.randn(64, 64))
+        opt_dense = SMO8bit([p_dense])  # 64x64 eligible -> but compare vs plain Adam
+        opt_adam = torch.optim.Adam([p_dense])
+        p_dense.grad = torch.randn_like(p_dense)
+        opt_adam.step()
+        self.assertLess(persistent_state_mb(opt), 0.35 * persistent_state_mb(opt_adam))
+
+    def test_second_moment_tracks_squared_gradient(self):
+        param = torch.nn.Parameter(torch.zeros(64, 32))
+        opt = self._make(param)
+        grad = torch.empty_like(param)
+        grad[:, ::2] = 4.0
+        grad[:, 1::2] = -4.0
+        param.grad = grad
+        opt.step()
+
+        st = opt.state[param]
+        v = opt._dequantize_blockwise(st["v_q"], st["v_s"], st["q_shape"], st["q_numel"])
+        expected = grad.square() * (1 - 0.999)
+        self.assertTrue(torch.allclose(v, expected, atol=expected.abs().max().item() * 0.02))
+
+    def test_smo_rejects_quant_only_group(self):
+        p = torch.nn.Parameter(torch.zeros(64, 64))
+        opt = SMO([{"params": [p], "compress": "quant_only"}], lr=1e-3)
+        p.grad = torch.randn_like(p)
+        with self.assertRaises(ValueError):
+            opt.step()
+
+
 class ConvQuantizationPolicyTests(unittest.TestCase):
     def test_no_nonzero_value_flushes_to_zero(self):
         # Round-to-nearest maps entries below half an LSB to exactly zero;

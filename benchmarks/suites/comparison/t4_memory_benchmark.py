@@ -85,8 +85,15 @@ def resolve_device(name: str) -> torch.device:
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def make_optimizer(name: str, model: nn.Module, lr: float, k_ratio: float, protect_output: bool = False, low_peak: bool = False, permute_basis: bool = False, compress_conv: bool = False):
-    """Build an optimizer; for SMO variants optionally exclude embedding/head params."""
+def make_optimizer(name: str, model: nn.Module, lr: float, k_ratio: float, protect_output=False, low_peak: bool = False, permute_basis: bool = False, compress_conv: bool = False):
+    """Build an optimizer; for SMO variants optionally exclude embedding/head params.
+
+    protect_output selects how excluded params are treated:
+      False        -> nothing protected
+      "dense"      -> full fp32 Adam moments (historical)
+      "quant"      -> full-resolution int8 moments, no spatial pooling
+                      (smo8bit only; falls back to dense for smo)
+    """
     if name == "adamw":
         return torch.optim.AdamW(model.parameters(), lr=lr, betas=(0.9, 0.999), eps=1e-8)
     if name == "bnb8bit":
@@ -109,14 +116,19 @@ def make_optimizer(name: str, model: nn.Module, lr: float, k_ratio: float, prote
             kwargs["compress_conv"] = True
         if not protect_output:
             return cls(model.parameters(), lr=lr, k_ratio=k_ratio, **kwargs)
+        mode = protect_output if protect_output in ("dense", "quant") else "dense"
+        if mode == "quant" and name != "smo8bit":
+            print("  protect_output=quant requires smo8bit; falling back to dense")
+            mode = "dense"
+        protected_flag = "quant_only" if mode == "quant" else False
         protected, regular = [], []
         for pname, p in model.named_parameters():
             (protected if ("emb" in pname or "head" in pname) else regular).append(p)
         groups = [
             *([{"params": regular, "compress": True}] if regular else []),
-            *([{"params": protected, "compress": False}] if protected else []),
+            *([{"params": protected, "compress": protected_flag}] if protected else []),
         ]
-        print(f"  protect_output: {sum(p.numel() for p in protected):,} protected / "
+        print(f"  protect_output={mode}: {sum(p.numel() for p in protected):,} protected / "
               f"{sum(p.numel() for p in regular):,} compressed params")
         return cls(groups, lr=lr, k_ratio=k_ratio, **kwargs)
     raise ValueError(f"Unknown optimizer: {name}")
@@ -479,8 +491,12 @@ def main():
     parser.add_argument("--seed", type=int, default=1234)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--k_ratio", type=float, default=0.25)
-    parser.add_argument("--protect_output", action="store_true",
-                        help="SMO variants: keep embedding/head params on dense Adam moments")
+    parser.add_argument("--protect_output", nargs="?", const="dense", default=None,
+                        choices=["dense", "quant"],
+                        help="SMO variants: keep embedding/head params out of spatial "
+                             "pooling. 'dense' = fp32 Adam moments (historical); "
+                             "'quant' = full-resolution int8 moments, no pooling "
+                             "(smo8bit only)")
     parser.add_argument("--low_peak", action="store_true",
                         help="SMO8bit: row-banded compress/update (no full-size temporaries)")
     parser.add_argument("--permute_basis", action="store_true",
@@ -577,7 +593,7 @@ def main():
             steps=args.steps if args.suite == "gpt" else None,
             metrics=result,
             extra={"workload": workload, "k_ratio": args.k_ratio, "metric_key": metric_key,
-                   "low_peak": bool(args.low_peak), "protect_output": bool(args.protect_output),
+                   "low_peak": bool(args.low_peak), "protect_output": args.protect_output or False,
                    "permute_basis": bool(args.permute_basis), "lr": args.lr},
         )
         runs.append(record)
