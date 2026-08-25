@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     does not hold across unrelated input channels; default stays dense-conv
   - Side product: seeded 10ep CIFAR-CNN baseline refreshed (Adam 72.90,
     SMO k=0.5 71.02, k=0.25 68.97)
+- **Wide-CNN replication probe** (`benchmark_cifar10_wide.py`, 2.5M params,
+  CPU, seed 1234): conv-pooling negative replicates at scale (69.79 vs its
+  dense fallback 76.11); and dense-conv SMO-k0.5 **beats Adam on the bigger
+  CNN** (76.11 vs 74.61) — the Phase-2 "CNNs are not SMO's turf" reading flips
+  with width; single-seed, multi-seed queued
 - **Dead-zone lift in SMO8bit quantization**: round-to-nearest used to flush
   sub-half-LSB moment entries to exact zero → v=0 → denominator ~eps → divergent
   updates (reproduced NaN losses on CNNs at block_size=64). Non-zero values are
