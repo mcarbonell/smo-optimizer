@@ -186,20 +186,26 @@ def main():
     parser = argparse.ArgumentParser(description="SMO vs Adam benchmark on CIFAR-10")
     parser.add_argument('--epochs', type=int, default=5, help='Number of training epochs')
     parser.add_argument('--seed', type=int, default=1234, help='Random seed for reproducibility')
+    parser.add_argument('--compress_conv', action='store_true',
+                        help='SMO: pool 4D conv weights via the flattened row view '
+                             '(opt-in; measured negative on CNNs)')
     args = parser.parse_args()
 
     device = 'cpu'
     epochs = args.epochs
     seed = args.seed
-    
+    compress_conv = bool(args.compress_conv)
+
     print("="*60)
     print(f"SWO Benchmark: SMO vs Standard Adam on CIFAR-10")
     print("="*60)
     print(f"Device: {device}")
     print(f"Epochs: {epochs}")
     print(f"Seed: {seed}")
+    if compress_conv:
+        print("compress_conv: True (conv weights pooled)")
     print("WARNING: On CPU this takes ~60-90 minutes total. Be patient.")
-    
+
     results_adam = run_experiment(
         "Standard Adam",
         lambda params: torch.optim.Adam(params, lr=1e-3),
@@ -207,18 +213,18 @@ def main():
         device=device,
         seed=seed
     )
-    
+
     results_swo = run_experiment(
         "SMO (k_ratio=0.25)",
-        lambda params: SMO(params, lr=1e-3, k_ratio=0.25),
+        lambda params: SMO(params, lr=1e-3, k_ratio=0.25, compress_conv=compress_conv),
         epochs=epochs,
         device=device,
         seed=seed
     )
-    
+
     results_swo_50 = run_experiment(
         "SMO (k_ratio=0.5)",
-        lambda params: SMO(params, lr=1e-3, k_ratio=0.5),
+        lambda params: SMO(params, lr=1e-3, k_ratio=0.5, compress_conv=compress_conv),
         epochs=epochs,
         device=device,
         seed=seed
