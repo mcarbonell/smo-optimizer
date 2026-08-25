@@ -101,7 +101,11 @@ estimation noise without destroying adaptivity. Full log: `docs/T4_FINDINGS.md`.
 
 - **Language modeling regresses**: char-LM val loss +0.21…+0.49 vs AdamW;
   `protect_output` recovers ~⅓. SMO's home turf today is vision-from-scratch.
-- **Only 2D params ≥32×32 are compressed**; conv weights fall back to dense moments.
+- **Compression targets 2D matrices ≥32×32** (linear weights); 4D conv weights
+  fall back to dense moments by default — flattening `(in_c, kh, kw)` into the
+  pooling axis averages across unrelated input channels and measured strongly
+  negative on CNNs (−12…−17 acc at matched budget). An opt-in
+  `compress_conv=True` exists for future basis experiments.
 - **Scale**: TinyViT (~15M) on CIFAR-10 and a ~40M char-LM are toy regimes; the
   700M killer-demo point validates fit/memory, not quality.
 - **Resident ≠ persistent**: SMO-Spatial keeps full-resolution reconstruction

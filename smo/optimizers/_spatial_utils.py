@@ -5,6 +5,41 @@ from __future__ import annotations
 import torch
 import torch.nn.functional as F
 
+# Tensors whose pooled view has any dimension below this fall back to dense
+# Adam moments (pooling too few coordinates per block is not a consensus).
+MIN_SPATIAL_DIM = 32
+
+
+def compression_view(shape, include_conv: bool = False):
+    """Return ``(view_2d_shape, param_shape)`` if a tensor is eligible for
+    spatial pooling, else ``None``.
+
+    Eligible tensors are treated as a 2D matrix of independent rows:
+
+    - 2D matrices (linear weights) with both dims >= ``MIN_SPATIAL_DIM``
+      (historical behavior);
+    - 4D conv weights ``(out_c, in_c, kh, kw)``, viewed as
+      ``(out_c, in_c * kh * kw)`` when both view dims qualify — **only when
+      ``include_conv=True``** (opt-in). Measured verdict at default-off
+      (CIFAR-CNN, 3ep, seed 1234): pooling over the flattened ``in_c*kh*kw``
+      axis costs the SMO family ~12-17 acc vs dense-conv fallback
+      (46.9/52.3 vs historical 63.6/64.8) because it averages across
+      unrelated input channels — H4's locality prior does NOT hold on that
+      axis. Kept available for future basis experiments.
+
+    The caller is responsible for ensuring the parameter itself is
+    contiguous before writing through the 2D view.
+    """
+    if len(shape) == 2:
+        if shape[0] >= MIN_SPATIAL_DIM and shape[1] >= MIN_SPATIAL_DIM:
+            return tuple(shape), tuple(shape)
+        return None
+    if len(shape) == 4 and include_conv:
+        flat_cols = shape[1] * shape[2] * shape[3]
+        if shape[0] >= MIN_SPATIAL_DIM and flat_cols >= MIN_SPATIAL_DIM:
+            return (shape[0], flat_cols), tuple(shape)
+    return None
+
 
 def _can_use_exact_pool(shape: tuple[int, int], target_shape: tuple[int, int]) -> bool:
     height, width = shape

@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Conv-weight pooling experiment (CPU day) — negative result, code kept opt-in**:
+  - `compression_view` + `compress_conv` flag on SMO/SMO8bit (and
+    `--compress_conv` on the T4 benchmark): pools 4D conv weights via the
+    flattened `(out_c, in_c*kh*kw)` row view, incl. `low_peak` banded path
+  - Measured verdict (CIFAR-CNN 3ep s1234): conv pooling costs the SMO family
+    −12…−17 acc vs dense fallback (46.9/52.3 vs historical 63.6/64.8) — H4's
+    locality prior does not hold across unrelated input channels; default stays
+    dense-conv
+- **Dead-zone lift in SMO8bit quantization**: round-to-nearest used to flush
+  sub-half-LSB moment entries to exact zero → v=0 → denominator ~eps → divergent
+  updates (reproduced NaN losses on CNNs at block_size=64). Non-zero values are
+  never encoded as zero anymore (+/-1 LSB worst-case bias)
+- Row-aligned quantization blocks for conv-view tensors (`state['q_block'] =
+  min(block_size, comp_w)`); linear matrices keep the historical flattened layout
 - **30-epoch convergence-budget table, multi-seed** (`docs/T4_FINDINGS.md`):
   SMO k=0.5 ties bnb-AdamW8bit at matched persistent bytes (80.29±0.55 vs
   80.13±0.79, z≈0.3); SMO-8bit k=0.5 −0.42 with 28% of bnb's state bytes;

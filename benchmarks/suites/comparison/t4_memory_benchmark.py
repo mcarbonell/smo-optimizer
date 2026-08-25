@@ -85,7 +85,7 @@ def resolve_device(name: str) -> torch.device:
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def make_optimizer(name: str, model: nn.Module, lr: float, k_ratio: float, protect_output: bool = False, low_peak: bool = False, permute_basis: bool = False):
+def make_optimizer(name: str, model: nn.Module, lr: float, k_ratio: float, protect_output: bool = False, low_peak: bool = False, permute_basis: bool = False, compress_conv: bool = False):
     """Build an optimizer; for SMO variants optionally exclude embedding/head params."""
     if name == "adamw":
         return torch.optim.AdamW(model.parameters(), lr=lr, betas=(0.9, 0.999), eps=1e-8)
@@ -105,6 +105,8 @@ def make_optimizer(name: str, model: nn.Module, lr: float, k_ratio: float, prote
             kwargs["low_peak"] = True
         if name == "smo8bit" and permute_basis:
             kwargs["permute_basis"] = True
+        if compress_conv:
+            kwargs["compress_conv"] = True
         if not protect_output:
             return cls(model.parameters(), lr=lr, k_ratio=k_ratio, **kwargs)
         protected, regular = [], []
@@ -146,13 +148,16 @@ def persistent_state_mb(optimizer) -> float:
     return total / (1024**2)
 
 
-def compressed_coverage(model: nn.Module) -> float:
-    """Fraction of parameters living in tensors SMO compresses (2D, both dims >= 32)."""
+def compressed_coverage(model: nn.Module, include_conv: bool = False) -> float:
+    """Fraction of parameters in tensors SMO compresses (2D matrices with
+    both dims >= 32; 4D conv weights only when include_conv)."""
+    from smo.optimizers._spatial_utils import compression_view
+
     covered = 0
     total = 0
     for p in model.parameters():
         total += p.numel()
-        if p.dim() == 2 and p.shape[0] >= 32 and p.shape[1] >= 32:
+        if p.is_contiguous() and compression_view(p.shape, include_conv=include_conv) is not None:
             covered += p.numel()
     return 100.0 * covered / max(1, total)
 
@@ -269,7 +274,8 @@ def run_gpt(args, opt_name: str, device: torch.device) -> dict:
     optimizer = make_optimizer(opt_name, model, args.lr, args.k_ratio,
                                getattr(args, "protect_output", False),
                                getattr(args, "low_peak", False),
-                               getattr(args, "permute_basis", False))
+                               getattr(args, "permute_basis", False),
+                               getattr(args, "compress_conv", False))
     scheduler = build_schedule(optimizer, warmup=100, total_steps=args.steps)
     scaler = torch.amp.GradScaler("cuda", enabled=args.amp and device.type == "cuda")
 
@@ -314,7 +320,7 @@ def run_gpt(args, opt_name: str, device: torch.device) -> dict:
     result = {
         "status": "ok",
         "params": n_params,
-        "coverage_pct": round(compressed_coverage(model), 2),
+        "coverage_pct": round(compressed_coverage(model, getattr(args, "compress_conv", False)), 2),
         "persistent_state_mb": round(persistent_state_mb(optimizer), 2),
         "final_val_loss": round(final_val, 4),
         "tokens_per_s": round(tokens_seen / wall),
@@ -412,7 +418,8 @@ def run_vit(args, opt_name: str, device: torch.device) -> dict:
     optimizer = make_optimizer(opt_name, model, args.lr, args.k_ratio,
                                getattr(args, "protect_output", False),
                                getattr(args, "low_peak", False),
-                               getattr(args, "permute_basis", False))
+                               getattr(args, "permute_basis", False),
+                               getattr(args, "compress_conv", False))
     steps_per_epoch = len(train_loader)
     scheduler = build_schedule(optimizer, warmup=max(1, steps_per_epoch // 5), total_steps=steps_per_epoch * args.epochs)
     scaler = torch.amp.GradScaler("cuda", enabled=autocast_on)
@@ -448,7 +455,7 @@ def run_vit(args, opt_name: str, device: torch.device) -> dict:
     result = {
         "status": "ok",
         "params": n_params,
-        "coverage_pct": round(compressed_coverage(model), 2),
+        "coverage_pct": round(compressed_coverage(model, getattr(args, "compress_conv", False)), 2),
         "persistent_state_mb": round(persistent_state_mb(optimizer), 2),
         "final_test_acc": round(final_acc, 2),
         "images_per_s": round(images_seen / wall),
@@ -478,6 +485,9 @@ def main():
                         help="SMO8bit: row-banded compress/update (no full-size temporaries)")
     parser.add_argument("--permute_basis", action="store_true",
                         help="SMO8bit: pool gradients in a random permuted basis (locality ablation)")
+    parser.add_argument("--compress_conv", action="store_true",
+                        help="SMO variants: also pool 4D conv weights (opt-in; measured "
+                             "negative on CNNs, see _spatial_utils.compression_view)")
     parser.add_argument("--tag", type=str, default="", help="Suffix for result filenames (multi-seed / ablations)")
     parser.add_argument("--amp", action="store_true", help="fp16 autocast for fwd/bwd (states stay fp32)")
     parser.add_argument("--eval_interval", type=int, default=100)
