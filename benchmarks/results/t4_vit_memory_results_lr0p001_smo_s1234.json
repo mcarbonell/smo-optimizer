@@ -1,8 +1,8 @@
 {
   "suite_name": "t4_gpu_memory_vit_lr0p001_smo_s1234",
   "benchmark_family": "gpu_memory_training",
-  "generated_at": "2026-08-25T08:44:11+00:00",
-  "git_commit": "082937eb68ba83f94ee178e54a3c8ef094b388c0",
+  "generated_at": "2026-08-25T09:21:01+00:00",
+  "git_commit": "90913c8bb99e041043dc4b46f30f4f09ea1d41b7",
   "host": {
     "platform": "Linux-6.6.122+-x86_64-with-glibc2.35",
     "python": "3.13.15"
@@ -21,8 +21,8 @@
   },
   "runs": [
     {
-      "date": "2026-08-25T08:44:11+00:00",
-      "git_commit": "082937eb68ba83f94ee178e54a3c8ef094b388c0",
+      "date": "2026-08-25T09:21:01+00:00",
+      "git_commit": "90913c8bb99e041043dc4b46f30f4f09ea1d41b7",
       "script_name": "benchmarks/suites/comparison/t4_memory_benchmark.py",
       "benchmark_family": "gpu_memory_training",
       "variant": "SMO k=0.5",
@@ -45,8 +45,8 @@
         "coverage_pct": 99.38,
         "persistent_state_mb": 27.68,
         "final_test_acc": 79.88,
-        "images_per_s": 986,
-        "wall_s": 1518.8,
+        "images_per_s": 975,
+        "wall_s": 1536.2,
         "history": [
           {
             "epoch": 1,
