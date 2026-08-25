@@ -211,59 +211,85 @@ Readings:
    persistent-state accounting — OOM does not depend on lr); the mechanism result H4
    (tested at matched budget); H8 curve shapes; the loss-matched methodology; and the
    3-epoch tuned regime where SMO still ranks #1 (+2.6).
-5. Honest current one-line verdict: *"With 98% less state and the lowest step-time
-   peak, SMO-8bit matches Adam-class optimizers' quality at equal budget and wins
-   short-budget regimes — but tuned bitsandbytes-8bit currently leads long-budget
-   vision quality."*
+5. Honest current one-line verdict (updated after k=0.5 multiseed): *"With up to
+   98% less state and the lowest step-time peak, SMO-8bit matches Adam-class
+   quality at equal budget and wins short-budget regimes; at the 30ep convergence
+   budget SMO k=0.5 ties tuned bitsandbytes-8bit at matched persistent bytes, and
+   SMO-8bit gives up ~0.4 pts while storing 28% of its bytes."*
 
 ### Convergence budget (30 epochs, tuned, multi-seed) — FINAL CAMPAIGN TABLE
 
 | Optimizer | config | acc (mean±std) | Δ vs bnb | Persistent state |
 |---|---|---|---|---|
-| bnb-AdamW8bit | lr 3e-4 | **80.13 ± 0.79** (n=3) | — | 27.85 MB |
+| **SMO k=0.5** | lr 1e-3 | **80.29 ± 0.55**† (n=3) | **+0.16** | 27.68 MB |
+| bnb-AdamW8bit | lr 3e-4 | 80.13 ± 0.79 (n=3) | — | 27.85 MB |
+| SMO-8bit k=0.5 | lr 1e-3 | 79.71 ± 0.39† (n=3) | −0.42 | **7.85 MB** |
 | SMO k=0.25 | lr 1.5e-3 | 78.78 ± 0.28 (n=3) | −1.35 | 7.43 MB |
-| SMO-8bit k=0.25 | lr 1.5e-3 | ~78.40 (n=2; s1234 bundle stranded in old session, expect ~78.3) | −1.73 | **2.47 MB** |
-| AdamW-fp32 | lr 6e-4 | 72.54 (n=1; 2 seeds queued) | −7.59 | 108.68 MB |
+| SMO-8bit k=0.25 | lr 1.5e-3 | 78.30 ± 0.53 (n=3) | −1.83 | **2.47 MB** |
+| AdamW-fp32 | lr 6e-4 | 73.39 ± 0.77 (n=3) | −6.74 | 108.68 MB |
+
+\† s1234 values (79.88 / 79.50) come from the original probe session whose JSON
+bundles were lost; they are cross-session reproducible (see k=0.5 section) and
+their regeneration into `benchmarks/results/` is queued.
 
 Readings:
 
-- **Tuned bnb leads convergence-budget quality by ~1.4–1.7 pts** over the SMO family —
-  a small, probably-real gap (≥2σ for SMO's tight σ=0.28).
-- **SMO at its true lr is extraordinarily stable**: σ=0.28 across seeds (bnb 0.79).
-  Third independent observation of variance collapse under moment smoothing.
+- **The top of the 30ep table is a statistical tie**: SMO k=0.5 stores the same
+  bytes as bnb (~2 B/param) and lands +0.16 nominal — z≈0.3 given both σs. Parity,
+  not victory; but the pre-k=0.5 story ("bnb leads by 1.35") is dead.
+- **Ranking flip via capacity**: doubling moment capacity moved SMO from −1.35 to
+  nominally #1. Confirms the mechanism result: the k=0.25 gap was compression
+  capacity, not smoothing dynamics.
+- **Stability survives the capacity increase**: σ = 0.55 (SMO k=0.5) / 0.39
+  (SMO-8bit k=0.5) vs bnb 0.79 — fourth observation of reduced seed variance under
+  moment smoothing, though weaker than k=0.25's σ=0.28.
 - The complete campaign picture across budgets (all best-tuned):
   - 3 epochs: SMO #1 (+2.6 over AdamW/bnb)
   - 10 epochs: bnb +2.2 over best SMO config
-  - 30 epochs: bnb +1.35/+1.73 over SMO/SMO-8bit
-  → bnb holds a slim long-budget edge; SMO wins short budgets and buys back the gap
-    with 11× less persistent state (SMO-8bit), the lowest step-time peak (low_peak),
-    and dramatically lower seed variance.
-- Both compressors dominate fp32 AdamW by ~6–7.6 pts at 30ep.
+  - 30 epochs: tie at the top (SMO k=0.5 +0.16 nominal); SMO-8bit k=0.5 gives up
+    only ~0.4 pts while storing 28% of bnb's bytes, plus the lowest step-time peak
+    (`low_peak`)
+  → honest long-budget verdict: at matched persistent bytes, spatial consensus
+    matches quantization; at half its bytes it costs ~0.4 pts. Short budgets still
+    belong to SMO outright.
+- All compressors dominate fp32 AdamW by ~5–7 pts at 30ep.
+- Caveat: k=0.5's lr=1e-3 is a single informed point (not bracketed at this
+  horizon); bnb's 3e-4 is in the same situation, so treatment is symmetric — but
+  neither peak is proven at 30ep.
 
-### k=0.5 capacity probe (30ep, seed 1234) — mechanism answered + matched-budget gem
+### k=0.5 capacity probe (30ep) — mechanism closed, confirmed multi-seed (session 4)
 
-| Config | acc | Persistent state | Bytes/param |
-|---|---|---|---|
-| SMO k=0.5 @1e-3 | **79.88** | 27.68 MB | 2 B (fp32, ¼ res) |
-| SMO-8bit k=0.5 @1e-3 | 79.50 | 7.85 MB | 0.5 B |
-| SMO k=0.25 @1.5e-3 | 78.64 | 7.43 MB | 1 B |
-| bnb-AdamW8bit @3e-4 | 79.22 | 27.85 MB | 2 B (int8, full res) |
+Probe was seed-1234-only; seeds 5678/9012 landed 2026-08-24. Per-seed test acc:
+
+| Config | s1234 | s5678 | s9012 | mean±std | Persistent state | Bytes/param |
+|---|---|---|---|---|---|---|
+| SMO k=0.5 @1e-3 | 79.88 | 80.92 | 80.07 | **80.29 ± 0.55** | 27.68 MB | 2 B (fp32, ¼ res) |
+| SMO-8bit k=0.5 @1e-3 | 79.50 | 80.16 | 79.48 | 79.71 ± 0.39 | 7.85 MB | 0.5 B |
+| SMO k=0.25 @1.5e-3 (ref) | 78.64 | — | — | 78.78 ± 0.28 (n=3) | 7.43 MB | 1 B |
+| bnb-AdamW8bit @3e-4 (ref) | 79.22 | — | — | 80.13 ± 0.79 (n=3) | 27.85 MB | 2 B (int8, full res) |
 
 Findings:
 
 1. **Mechanism closed**: doubling compressed-moment capacity erased the gap to bnb
-   (78.64→79.88). The k=0.25 deficit was mostly *information lost to compression*,
-   not the smoothing dynamics themselves.
-2. **Matched-state-budget comparison (unplanned)**: SMO k=0.5 and bnb both store
-   exactly 2 B/param. At equal persistent bytes: spatial consensus 79.88 vs
-   quantization 79.22 (**+0.66, single seed**). Where you compress matters more than
-   how much — pending multi-seed confirmation.
-3. LR shifts down with k (1e-3 optimal for k=0.5 vs 1.5e-3 for k=0.25): less
-   smoothing → smaller effective-step boost. Consistent with H8.
-4. SMO-8bit k=0.5 delivers 79.50 at HALF of bnb's state bytes (0.5 B/param).
+   (k=0.25: 78.78 → k=0.5: 80.29). The k=0.25 deficit was mostly *information lost
+   to compression*, not the smoothing dynamics themselves.
+2. **Matched-state-budget verdict (revised by multiseed)**: SMO k=0.5 and bnb both
+   store ~2 B/param. At equal persistent bytes: 80.29±0.55 vs 80.13±0.79 →
+   **Δ +0.16, z≈0.3 — statistical tie, nominally ahead**. The probe's +0.66
+   single-seed margin shrank with seeds; recorded honestly. Where you compress
+   matters as much as how much.
+3. **SMO-8bit k=0.5 trades ~0.4 pts for 72% fewer state bytes than bnb**
+   (0.5 B/param; −93% vs AdamW) — and stays the lowest step-time peak option with
+   `low_peak`.
+4. LR shifts down with k (1e-3 for k=0.5 vs 1.5e-3 for k=0.25): less smoothing →
+   smaller effective-step boost. Consistent with H8.
+5. Determinism note: the probe's s1234 runs were re-executed in an independent
+   later session and reproduced exactly (79.88 / 79.50 both times). Both sessions'
+   JSON bundles were lost before commit — only the s5678/s9012 bundles from
+   session 4 are versioned.
 
-Caveats: all single-seed; k=0.5 multiseed queued. Session dropped mid-queue
-(spectral scouting + H4 extras still pending).
+Caveats: s1234 bundles pending regeneration into `benchmarks/results/`; the k=0.5
+lr grid is a single point at this horizon (see final-table caveat).
 
 ### CharGPT char-LM on tiny-shakespeare (~40M params, 1000 steps, seed=1234)
 
@@ -350,8 +376,12 @@ Caveats: all single-seed; k=0.5 multiseed queued. Session dropped mid-queue
 - [x] **Tuned star run** — DONE. Headline reversed: tuned bnb-8bit leads (70.65±0.63);
       SMO's best-known 10ep config remains @1e-3 (68.40±0.38). LR selection does not
       transfer across horizons (see star-run section). Memory/mechanism claims unaffected.
-- [ ] **30ep table completion**: adamw@6e-4 seeds 5678/9012 (~45 min); recover or re-run
-      smo8bit@1.5e-3 s1234 (stranded bundle from old session, ~22 min)
+- [x] **30ep table completion** — DONE: adamw@6e-4 n=3 (73.39±0.77); smo8bit@1.5e-3
+      n=3 (78.30±0.53, s1234 recovered)
+- [x] **k=0.5 multiseed** — DONE (session 4): SMO k=0.5 80.29±0.55; SMO-8bit k=0.5
+      79.71±0.39. Statistical tie with bnb at matched state bytes (see k=0.5 section)
+- [ ] Regenerate lost s1234 JSON bundles for k=0.5 @1e-3 (~50 min GPU): values are
+      known and cross-session reproducible (79.88 / 79.50) but no bundle is versioned
 - [ ] H4: add 2 extra seeds to the permute ablation (8 min each)
 - [ ] Optional: sgdm@6e-2 bracket already done; finer grid polish deferred
 - [ ] Port row-banded update to SMO-Spatial (same transient bottleneck there:
