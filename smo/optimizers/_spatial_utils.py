@@ -21,11 +21,12 @@ def compression_view(shape, include_conv: bool = False):
     - 4D conv weights ``(out_c, in_c, kh, kw)``, viewed as
       ``(out_c, in_c * kh * kw)`` when both view dims qualify — **only when
       ``include_conv=True``** (opt-in). Measured verdict at default-off
-      (CIFAR-CNN, 3ep, seed 1234): pooling over the flattened ``in_c*kh*kw``
-      axis costs the SMO family ~12-17 acc vs dense-conv fallback
-      (46.9/52.3 vs historical 63.6/64.8) because it averages across
-      unrelated input channels — H4's locality prior does NOT hold on that
-      axis. Kept available for future basis experiments.
+      (CIFAR-CNN, seed 1234): pooling over the flattened ``in_c*kh*kw`` axis
+      costs the SMO family heavily and does NOT recover with training length
+      (3ep: 46.9/52.3 vs dense-fallback 58.3/62.0; 10ep: 58.6/65.5 vs
+      69.0/71.0; Adam 72.9) — averaging across unrelated input channels
+      violates H4's locality prior. Kept available for future basis
+      experiments.
 
     The caller is responsible for ensuring the parameter itself is
     contiguous before writing through the 2D view.

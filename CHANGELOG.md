@@ -12,10 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `compression_view` + `compress_conv` flag on SMO/SMO8bit (and
     `--compress_conv` on the T4 benchmark): pools 4D conv weights via the
     flattened `(out_c, in_c*kh*kw)` row view, incl. `low_peak` banded path
-  - Measured verdict (CIFAR-CNN 3ep s1234): conv pooling costs the SMO family
-    −12…−17 acc vs dense fallback (46.9/52.3 vs historical 63.6/64.8) — H4's
-    locality prior does not hold across unrelated input channels; default stays
-    dense-conv
+  - Measured verdict (CIFAR-CNN, seed 1234): conv pooling costs the SMO family
+    heavily and does NOT recover with horizon — 3ep 46.9/52.3 vs dense-fallback
+    58.3/62.0; 10ep 58.6/65.5 vs 69.0/71.0 (Adam 72.9). H4's locality prior
+    does not hold across unrelated input channels; default stays dense-conv
+  - Side product: seeded 10ep CIFAR-CNN baseline refreshed (Adam 72.90,
+    SMO k=0.5 71.02, k=0.25 68.97)
 - **Dead-zone lift in SMO8bit quantization**: round-to-nearest used to flush
   sub-half-LSB moment entries to exact zero → v=0 → denominator ~eps → divergent
   updates (reproduced NaN losses on CNNs at block_size=64). Non-zero values are
