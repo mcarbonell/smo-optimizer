@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`quant_only` protection mode** (`--protect_output quant`, group flag
+  `"compress": "quant_only"`): embedding/head params keep full-resolution int8
+  moments — no spatial pooling (tokens never mixed) at ~1 B/param instead of
+  dense fp32's 8 B/param. CharGPT CPU session: quality identical to dense
+  protection (1.7005 vs 1.7007); k=0.5+protect combo closes ~75% of the LM
+  regression (+0.49 → +0.12 vs AdamW). Scale-LM payoff pending (embedding is
+  25–35% of params there)
 - **Conv-weight pooling experiment (CPU day) — negative result, code kept opt-in**:
   - `compression_view` + `compress_conv` flag on SMO/SMO8bit (and
     `--compress_conv` on the T4 benchmark): pools 4D conv weights via the

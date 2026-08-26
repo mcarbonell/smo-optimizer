@@ -1,0 +1,94 @@
+{
+  "date": "2026-08-26T01:06:39+00:00",
+  "git_commit": "6a32f2e575e5fcc53b28c7b915884452df01d626",
+  "script_name": "benchmarks/suites/comparison/t4_memory_benchmark.py",
+  "benchmark_family": "gpu_memory_training",
+  "variant": "SMO-8bit k=0.5",
+  "hardware": "CPU",
+  "backend": "cpu",
+  "framework_versions": {
+    "torch": "2.10.0+cpu"
+  },
+  "dataset": "tiny-shakespeare",
+  "model": "CharGPT",
+  "seed": 1234,
+  "batch_size": null,
+  "precision": "fp32",
+  "epochs": null,
+  "steps": 1000,
+  "metrics": {
+    "status": "ok",
+    "params": 25384448,
+    "coverage_pct": 99.79,
+    "persistent_state_mb": 14.42,
+    "final_val_loss": 1.7007,
+    "tokens_per_s": 961,
+    "wall_s": 8522.0,
+    "history": [
+      {
+        "step": 100,
+        "train_loss": 2.4944,
+        "val_loss": 2.5219
+      },
+      {
+        "step": 200,
+        "train_loss": 2.4623,
+        "val_loss": 2.4083
+      },
+      {
+        "step": 300,
+        "train_loss": 2.0929,
+        "val_loss": 2.1393
+      },
+      {
+        "step": 400,
+        "train_loss": 1.9412,
+        "val_loss": 1.9978
+      },
+      {
+        "step": 500,
+        "train_loss": 1.7635,
+        "val_loss": 1.8904
+      },
+      {
+        "step": 600,
+        "train_loss": 1.6879,
+        "val_loss": 1.7997
+      },
+      {
+        "step": 700,
+        "train_loss": 1.6471,
+        "val_loss": 1.7621
+      },
+      {
+        "step": 800,
+        "train_loss": 1.571,
+        "val_loss": 1.7232
+      },
+      {
+        "step": 900,
+        "train_loss": 1.5898,
+        "val_loss": 1.701
+      },
+      {
+        "step": 1000,
+        "train_loss": 1.6069,
+        "val_loss": 1.7007
+      }
+    ]
+  },
+  "workload": {
+    "d_model": 512,
+    "layers": 8,
+    "heads": 8,
+    "block_size": 256,
+    "batch": 32,
+    "steps": 1000
+  },
+  "k_ratio": 0.5,
+  "metric_key": "final_val_loss",
+  "low_peak": false,
+  "protect_output": "dense",
+  "permute_basis": false,
+  "lr": 0.001
+}

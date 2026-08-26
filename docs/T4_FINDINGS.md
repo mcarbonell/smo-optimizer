@@ -305,6 +305,35 @@ the k=0.5 lr grid is a single point at this horizon (see final-table caveat).
 | SMO k=0.25 + protect_output | 1.9125 | +0.33 | 13.7 MB | 1841 MB |
 | SMO-8bit k=0.25 + protect_output | 1.8915 | +0.31 | 4.9 MB | 1621 MB |
 
+### protect_output=quant + k=0.5 combo (CPU session, 2026-08-25) — LM gap mostly closed
+
+New mode `"compress": "quant_only"` (`--protect_output quant`): protected
+embedding/head params keep FULL-resolution int8 moments — no spatial pooling
+(tokens never mixed), ~1 B/param instead of dense fp32's 8 B/param.
+
+CharGPT (~40M), 1000 steps, seed 1234, CPU (fp32 path — reproduces the GPU
+numbers above within ±0.002, another cross-device determinism datapoint):
+
+| Config | val loss | Δ vs AdamW | Persistent state |
+|---|---|---|---|
+| AdamW-fp32 | 1.5785 | — | 193.67 MB |
+| SMO-8bit k=0.5 | 1.8024 | +0.224 | 13.25 MB |
+| SMO-8bit k=0.5 + protect dense | 1.7007 | +0.122 | 14.42 MB |
+| **SMO-8bit k=0.5 + protect quant** | **1.7005** | **+0.122** | **13.50 MB** |
+
+Readings:
+
+1. **quant ≡ dense protection in quality** (Δ = 0.0002 over the full run):
+   int8 moment storage on protected params is free. Here the embedding is
+   tiny so state barely moves (13.50 vs 14.42 MB); in scale LMs where the
+   embedding table is 25–35% of params, protecting it densely forfeits most
+   of the saving while `quant` keeps it.
+2. **The k=0.5 + protect combo closes ~75% of the original LM regression**
+   (+0.49 at k=0.25 unprotected → +0.12). Capacity plus output-layer hygiene
+   compound; the residual +0.12 is the first candidate for k=0.75 or
+   hidden-layer-specific treatment.
+3. Cross-device check: unprotected k=0.5 gives 1.8024 (CPU) vs 1.8009 (GPU).
+
 ---
 
 ## Findings
